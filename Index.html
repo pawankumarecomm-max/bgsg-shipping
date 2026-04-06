@@ -181,6 +181,12 @@
   .page-tab:hover { color: var(--text); }
 
   .empty { text-align: center; padding: 3rem; color: var(--text3); font-size: 13px; }
+  .q-search-item { padding: 10px 12px; border-bottom: 1px solid var(--border); cursor: pointer; background: var(--surface); }
+  .q-search-item:last-child { border-bottom: none; }
+  .q-search-item:hover { background: var(--surface2); }
+  .q-search-main { font-size: 12px; color: var(--text); font-weight: 500; }
+  .q-search-sub { font-size: 11px; color: var(--text2); margin-top: 3px; line-height: 1.4; }
+  .q-search-empty { padding: 12px; font-size: 12px; color: var(--text3); }
 
   @media (max-width: 900px) {
     .kpi-grid { grid-template-columns: repeat(2, 1fr); }
@@ -310,6 +316,22 @@
     <div class="card" style="margin-bottom:1rem;">
       <div class="card-body" style="padding:1rem 1.25rem;">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;align-items:end;">
+          <div class="form-group" style="min-width:260px;position:relative;">
+            <label>Link to Shipment</label>
+            <input id="q-shipment-search" type="text" placeholder="Search by shipment no, customer, shipper, receiver, invoice, origin, destination..." autocomplete="off"
+              oninput="filterQuoteShipmentSearch()" onfocus="filterQuoteShipmentSearch()">
+            <select id="q-shipment-select" onchange="selectQuoteShipment(this.value)" style="display:none;">
+              <option value="">— Standalone Quote —</option>
+            </select>
+            <div id="q-shipment-results" style="display:none;position:absolute;left:0;right:0;top:100%;margin-top:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.08);max-height:260px;overflow:auto;z-index:30;"></div>
+          </div>
+          <div class="form-group" style="min-width:180px;">
+            <label>&nbsp;</label>
+            <button class="btn" type="button" onclick="clearQuoteShipmentLink()">Unlink Shipment</button>
+          </div>
+          <div class="form-group full">
+            <div id="q-shipment-info" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--text2);"></div>
+          </div>
           <div class="form-group">
             <label>Customer</label>
             <input id="q-customer" type="text" placeholder="Customer name">
@@ -480,11 +502,14 @@
       <div class="card-header"><div class="card-title">Select Shipment</div></div>
       <div class="card-body">
         <div class="form-grid-2">
-          <div class="form-group">
+          <div class="form-group" style="position:relative;">
             <label>Shipment / AWB Reference</label>
-            <select id="inv-shipment-sel" onchange="loadInvoiceShipment()">
+            <input id="inv-shipment-search" type="text" placeholder="Search by shipment no, invoice, customer, shipper, receiver, route..." autocomplete="off"
+              oninput="filterInvoiceShipmentSearch()" onfocus="filterInvoiceShipmentSearch()">
+            <select id="inv-shipment-sel" onchange="loadInvoiceShipment()" style="display:none;">
               <option value="">-- Select Shipment --</option>
             </select>
+            <div id="inv-shipment-results" style="display:none;position:absolute;left:0;right:0;top:100%;margin-top:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.08);max-height:260px;overflow:auto;z-index:30;"></div>
           </div>
           <div class="form-group">
             <label>Invoice Number (from Shipping Company)</label>
@@ -562,9 +587,9 @@
       <div style="background:var(--accent2);border:1.5px solid #9FE1CB;border-radius:8px;padding:12px 16px;margin-bottom:1.25rem;display:flex;align-items:center;gap:14px;">
         <div style="flex:1;">
           <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--accent3);display:block;margin-bottom:5px;">Shipment Code <span style="color:var(--danger);">*</span></label>
-          <input id="s-shipcode" type="text" placeholder="e.g. IMP-2526-001 or EXP-UK-042" style="background:#fff;border-color:#9FE1CB;font-family:'DM Mono',monospace;font-size:14px;font-weight:500;letter-spacing:.04em;">
+          <input id="s-shipcode" type="text" placeholder="e.g. 30" inputmode="numeric" style="background:#fff;border-color:#9FE1CB;font-family:'DM Mono',monospace;font-size:14px;font-weight:500;letter-spacing:.04em;">
         </div>
-        <div style="font-size:11px;color:var(--accent3);max-width:200px;line-height:1.5;">Enter a unique code you'll use to identify this shipment across all records.</div>
+        <div style="font-size:11px;color:var(--accent3);max-width:200px;line-height:1.5;">Use a simple shipment number like 30, 31, 32.</div>
       </div>
       <div class="form-grid">
         <div class="form-group">
@@ -576,12 +601,16 @@
           <input id="s-po" type="text">
         </div>
         <div class="form-group">
-          <label>Customer (Receiver)</label>
+          <label>Customer Name</label>
           <input id="s-customer" type="text" placeholder="Customer name">
         </div>
         <div class="form-group">
-          <label>Sender</label>
-          <input id="s-sender" type="text" placeholder="Sender / Supplier">
+          <label>Shipper</label>
+          <input id="s-sender" type="text" placeholder="Shipper name">
+        </div>
+        <div class="form-group">
+          <label>Receiver</label>
+          <input id="s-receiver" type="text" placeholder="Receiver name">
         </div>
         <div class="form-group">
           <label>Origin Country</label>
@@ -762,6 +791,131 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
 let shipments = [], payments = [], quotes = [], invoices = [];
 let quoteTemplates = [];
 let editIdx = -1;
+let shipmentStorageMode = 'json';
+
+const SHIPMENT_SELECT_COLUMNS = [
+  'id',
+  'app_id',
+  'shipcode',
+  'invoice',
+  'po',
+  'customer_name',
+  'shipper',
+  'receiver',
+  'origin',
+  'dest',
+  'mode',
+  'prodtype',
+  'units',
+  'sku',
+  'invdate',
+  'pickup',
+  'eta',
+  'delivery',
+  'status',
+  'quote_status',
+  'billing',
+  'carrier',
+  'shipcost',
+  'currency',
+  'remarks',
+  'related_quote_id',
+  'related_quote_dbid',
+  'related_quote_date',
+  'created_at',
+  'updated_at'
+].join(', ');
+
+function cleanNullable(v) {
+  if (v === undefined || v === null) return null;
+  const s = String(v).trim();
+  return s === '' ? null : s;
+}
+function toNumberOrNull(v) {
+  if (v === undefined || v === null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+function toDateOrNull(v) {
+  const s = cleanNullable(v);
+  return s || null;
+}
+function shipmentRecordToRow(record = {}) {
+  return {
+    app_id: cleanNullable(record.id),
+    shipcode: cleanNullable(simplifyShipmentCode(record.shipcode || record.id || '')),
+    invoice: cleanNullable(record.invoice),
+    po: cleanNullable(record.po),
+    customer_name: cleanNullable(getShipmentCustomerName(record)),
+    shipper: cleanNullable(getShipmentShipperName(record)),
+    receiver: cleanNullable(getShipmentReceiverName(record)),
+    origin: cleanNullable(record.origin),
+    dest: cleanNullable(record.dest),
+    mode: cleanNullable(record.mode),
+    prodtype: cleanNullable(record.prodtype),
+    units: toNumberOrNull(record.units),
+    sku: cleanNullable(record.sku),
+    invdate: toDateOrNull(record.invdate),
+    pickup: toDateOrNull(record.pickup),
+    eta: toDateOrNull(record.eta),
+    delivery: toDateOrNull(record.delivery),
+    status: cleanNullable(record.status),
+    quote_status: cleanNullable(record.quotestatus),
+    billing: cleanNullable(record.billing),
+    carrier: cleanNullable(record.carrier),
+    shipcost: toNumberOrNull(record.shipcost),
+    currency: cleanNullable(record.currency),
+    remarks: cleanNullable(record.remarks),
+    related_quote_id: cleanNullable(record.relatedQuoteId),
+    related_quote_dbid: cleanNullable(record.relatedQuoteDbid),
+    related_quote_date: toDateOrNull(record.relatedQuoteDate)
+  };
+}
+function shipmentRowToRecord(row = {}) {
+  return normalizeShipmentRecord({
+    id: row.app_id || ('SHP' + String(row.id || '')),
+    _dbid: row.id,
+    shipcode: row.shipcode || row.app_id || '',
+    invoice: row.invoice || '',
+    po: row.po || '',
+    customerName: row.customer_name || '',
+    customer: row.customer_name || '',
+    shipper: row.shipper || '',
+    sender: row.shipper || '',
+    receiver: row.receiver || '',
+    origin: row.origin || '',
+    dest: row.dest || '',
+    mode: row.mode || '',
+    prodtype: row.prodtype || '',
+    units: row.units ?? '',
+    sku: row.sku || '',
+    invdate: row.invdate || '',
+    pickup: row.pickup || '',
+    eta: row.eta || '',
+    delivery: row.delivery || '',
+    status: row.status || '',
+    quotestatus: row.quote_status || '',
+    billing: row.billing || '',
+    carrier: row.carrier || '',
+    shipcost: row.shipcost ?? '',
+    currency: row.currency || '',
+    remarks: row.remarks || '',
+    relatedQuoteId: row.related_quote_id || '',
+    relatedQuoteDbid: row.related_quote_dbid || '',
+    relatedQuoteDate: row.related_quote_date || ''
+  });
+}
+async function loadShipmentsFromDb() {
+  const normalizedRes = await supa.from('shipments').select(SHIPMENT_SELECT_COLUMNS).order('created_at', {ascending:true});
+  if (!normalizedRes.error) {
+    shipmentStorageMode = 'normalized';
+    return normalizedRes.data.map(shipmentRowToRecord);
+  }
+  const legacyRes = await supa.from('shipments').select('*').order('created_at', {ascending:true});
+  if (legacyRes.error) throw (normalizedRes.error || legacyRes.error);
+  shipmentStorageMode = 'json';
+  return rowsToRecords(legacyRes.data).map(normalizeShipmentRecord);
+}
 let paymentStatusFilters = { receivable: 'all', payable: 'all' };
 
 // ─── TOAST NOTIFICATIONS ─────────────────────────────────────────────────────
@@ -785,6 +939,49 @@ function showToast(msg, type='info') {
 // All records stored as {data: {...appRecord}, created_at: auto}
 // We map: DB row id → record._dbid for updates/deletes
 
+function simplifyShipmentCode(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  const matches = raw.match(/\d+/g);
+  if (matches && matches.length) {
+    const cleaned = String(parseInt(matches[matches.length - 1], 10));
+    return cleaned === 'NaN' ? raw : cleaned;
+  }
+  return raw;
+}
+function getShipmentCustomerName(s) {
+  return (s?.customerName || s?.customer || '').trim();
+}
+function getShipmentShipperName(s) {
+  return (s?.shipper || s?.sender || '').trim();
+}
+function getShipmentReceiverName(s) {
+  return (s?.receiver || s?.customer || '').trim();
+}
+function normalizeShipmentRecord(s = {}) {
+  const normalized = { ...s };
+  normalized.shipcode = simplifyShipmentCode(normalized.shipcode || normalized.id || '');
+  normalized.customerName = getShipmentCustomerName(normalized);
+  normalized.shipper = getShipmentShipperName(normalized);
+  normalized.receiver = getShipmentReceiverName(normalized);
+  normalized.customer = normalized.customerName;
+  normalized.sender = normalized.shipper;
+  return normalized;
+}
+function normalizeQuoteRecord(q = {}) {
+  const normalized = { ...q };
+  if (normalized.shipcode) normalized.shipcode = simplifyShipmentCode(normalized.shipcode);
+  return normalized;
+}
+function getNextShipmentCode() {
+  let maxNo = 0;
+  shipments.forEach(s => {
+    const num = parseInt(simplifyShipmentCode(s?.shipcode || s?.id || ''), 10);
+    if (!Number.isNaN(num)) maxNo = Math.max(maxNo, num);
+  });
+  return String(maxNo + 1);
+}
+
 function rowsToRecords(rows) {
   return (rows || []).map(r => ({ ...r.data, _dbid: r.id }));
 }
@@ -792,17 +989,16 @@ function rowsToRecords(rows) {
 async function dbLoad() {
   showToast('Connecting to BGSG database…', 'info');
   try {
-    const [s, p, q, inv, tpl] = await Promise.all([
-      supa.from('shipments').select('*').order('created_at', {ascending:true}),
+    shipments = await loadShipmentsFromDb();
+    const [p, q, inv, tpl] = await Promise.all([
       supa.from('payments').select('*').order('created_at', {ascending:true}),
       supa.from('quotes').select('*').order('created_at', {ascending:true}),
       supa.from('invoices').select('*').order('created_at', {ascending:true}),
       supa.from('quote_templates').select('*').order('created_at', {ascending:true}),
     ]);
-    if (s.error || p.error) throw (s.error || p.error);
-    shipments      = rowsToRecords(s.data);
+    if (p.error || q.error || inv.error || tpl.error) throw (p.error || q.error || inv.error || tpl.error);
     payments       = rowsToRecords(p.data);
-    quotes         = rowsToRecords(q.data);
+    quotes         = rowsToRecords(q.data).map(normalizeQuoteRecord);
     invoices       = rowsToRecords(inv.data);
     quoteTemplates = rowsToRecords(tpl.data);
 
@@ -810,25 +1006,35 @@ async function dbLoad() {
       showToast('Empty database — seeding sample data…', 'info');
       await dbSeedSamples();
     } else {
-      showToast(`Loaded ${shipments.length} shipments ✓`, 'success');
+      showToast(`Loaded ${shipments.length} shipments ✓ (${shipmentStorageMode === 'normalized' ? 'SQL columns' : 'legacy JSON mode'})`, 'success');
     }
   } catch(err) {
     console.error('Supabase error:', err);
-    showToast('Could not reach Supabase — check RLS policies & table names', 'error');
+    showToast('Could not reach Supabase — check RLS policies, table names, or run the shipments SQL migration', 'error');
     _localFallback();
   }
   renderDashboard();
 }
 
 async function dbInsert(table, record) {
-  const {data, error} = await supa.from(table).insert({data: record}).select('id').single();
+  let data, error;
+  if (table === 'shipments' && shipmentStorageMode === 'normalized') {
+    ({data, error} = await supa.from(table).insert(shipmentRecordToRow(record)).select('id').single());
+  } else {
+    ({data, error} = await supa.from(table).insert({data: record}).select('id').single());
+  }
   if (error) { showToast('Save failed: ' + error.message, 'error'); throw error; }
   record._dbid = data.id;
   return data.id;
 }
 
 async function dbUpdate(table, record) {
-  const {error} = await supa.from(table).update({data: record}).eq('id', record._dbid);
+  let error;
+  if (table === 'shipments' && shipmentStorageMode === 'normalized') {
+    ({error} = await supa.from(table).update(shipmentRecordToRow(record)).eq('id', record._dbid));
+  } else {
+    ({error} = await supa.from(table).update({data: record}).eq('id', record._dbid));
+  }
   if (error) { showToast('Update failed: ' + error.message, 'error'); throw error; }
 }
 
@@ -837,13 +1043,13 @@ async function dbDeleteRow(table, dbid) {
   if (error) { showToast('Delete failed: ' + error.message, 'error'); throw error; }
 }
 
-// ─── LOCAL FALLBACK ───────────────────────────────────────────────────────────
+// // ─── LOCAL FALLBACK ───────────────────────────────────────────────────────────
 function _localFallback() {
-  shipments      = JSON.parse(localStorage.getItem('bgsg_shipments')  || '[]');
+  shipments      = JSON.parse(localStorage.getItem('bgsg_shipments')  || '[]').map(normalizeShipmentRecord);
   payments       = JSON.parse(localStorage.getItem('bgsg_payments')   || '[]');
-  quotes         = JSON.parse(localStorage.getItem('bgsg_quotes')     || '[]');
+  quotes         = JSON.parse(localStorage.getItem('bgsg_quotes')     || '[]').map(normalizeQuoteRecord);
   quoteTemplates = JSON.parse(localStorage.getItem('bgsg_qtemplates') || '[]');
-  if (!shipments.length) { shipments = _sampleShipments(); payments = _samplePayments(); }
+  if (!shipments.length) { shipments = _sampleShipments().map(normalizeShipmentRecord); payments = _samplePayments(); }
   _saveLocal();
 }
 function _saveLocal() {
@@ -880,8 +1086,16 @@ function _samplePayments() {
   ];
 }
 async function dbSeedSamples() {
-  const ss = _sampleShipments(); const pp = _samplePayments();
-  for (const s of ss) { const {data} = await supa.from('shipments').insert({data:s}).select('id').single(); if(data) s._dbid=data.id; }
+  const ss = _sampleShipments().map(normalizeShipmentRecord); const pp = _samplePayments();
+  for (const s of ss) {
+    let data;
+    if (shipmentStorageMode === 'normalized') {
+      ({data} = await supa.from('shipments').insert(shipmentRecordToRow(s)).select('id').single());
+    } else {
+      ({data} = await supa.from('shipments').insert({data:s}).select('id').single());
+    }
+    if (data) s._dbid = data.id;
+  }
   for (const p of pp) { const {data} = await supa.from('payments').insert({data:p}).select('id').single(); if(data) p._dbid=data.id; }
   shipments = ss; payments = pp;
   showToast('Sample data loaded ✓', 'success');
@@ -898,6 +1112,7 @@ function showPage(page, el) {
   if(page==='quotes') {
     if(!quoteLines.length) loadPreset('sea'); else renderQuoteLines();
     refreshTemplateDropdown();
+    populateQuoteShipmentSelect(activeQuoteShipmentLink || '');
     renderQuotesHistory();
     updateCurrencyLabels();
     const curSel = document.getElementById('q-currency');
@@ -974,13 +1189,13 @@ function renderDashboard() {
   // Recent shipments table
   const recent = [...shipments].reverse().slice(0,5);
   document.getElementById('dash-shipments').innerHTML = `
-    <thead><tr><th>Code</th><th>Invoice</th><th>Receiver</th><th>Route</th><th>Mode</th><th>ETA</th><th>Status</th></tr></thead>
+    <thead><tr><th>No.</th><th>Invoice</th><th>Customer</th><th>Receiver</th><th>Route</th><th>ETA</th><th>Status</th></tr></thead>
     <tbody>${recent.map(s=>`<tr>
-      <td><span class="mono" style="font-weight:600;color:var(--accent3);background:var(--accent2);padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap;">${s.shipcode||s.id}</span></td>
+      <td><span class="mono" style="font-weight:600;color:var(--accent3);background:var(--accent2);padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap;">${simplifyShipmentCode(s.shipcode||s.id)}</span></td>
       <td class="mono" style="font-size:11px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${s.invoice}">${s.invoice}</td>
-      <td>${s.customer}</td>
+      <td>${getShipmentCustomerName(s) || '-'}</td>
+      <td>${getShipmentReceiverName(s) || '-'}</td>
       <td style="font-size:12px;">${s.origin} → ${s.dest}</td>
-      <td><span class="badge ${modeColor(s.mode)}" style="font-size:10px;">${s.mode.replace('Export','Exp').replace('Import','Imp')}</span></td>
       <td class="mono" style="font-size:11px;">${s.eta||'-'}</td>
       <td><span class="badge ${statusColor(s.status)}">${s.status}</span></td>
     </tr>`).join('')}</tbody>`;
@@ -1036,16 +1251,19 @@ function renderShipmentsTable() {
   const mode = (document.getElementById('ship-mode')||{value:''}).value;
   const currency = (document.getElementById('ship-currency')||{value:''}).value;
 
-  // Populate customer filter
   const custSel = document.getElementById('ship-customer');
   if(custSel && custSel.options.length === 1) {
-    [...new Set(shipments.map(s=>s.customer))].forEach(c=>{const o=document.createElement('option');o.value=c;o.text=c;custSel.appendChild(o);});
+    [...new Set(shipments.map(s=>getShipmentCustomerName(s)).filter(Boolean))].forEach(c=>{const o=document.createElement('option');o.value=c;o.text=c;custSel.appendChild(o);});
   }
 
   let filtered = shipments.filter(s=>{
-    if(search && !JSON.stringify(s).toLowerCase().includes(search)) return false;
+    const hay = [
+      s.shipcode, s.id, s.invoice, s.origin, s.dest, s.mode, s.sku,
+      getShipmentCustomerName(s), getShipmentShipperName(s), getShipmentReceiverName(s)
+    ].filter(Boolean).join(' ').toLowerCase();
+    if(search && !hay.includes(search)) return false;
     if(status && s.status?.toLowerCase()!==status.toLowerCase()) return false;
-    if(customer && s.customer!==customer) return false;
+    if(customer && getShipmentCustomerName(s)!==customer) return false;
     if(mode && !s.mode?.toLowerCase().includes(mode.toLowerCase())) return false;
     if(currency && (s.currency || '').toUpperCase() !== currency.toUpperCase()) return false;
     return true;
@@ -1058,8 +1276,9 @@ function renderShipmentsTable() {
   if(!t) return;
   t.innerHTML = `
     <thead><tr>
-      <th>Shipment Code</th>
+      <th>Shipment No.</th>
       <th>Invoice No.</th>
+      <th>Customer Name</th>
       <th>Shipper</th>
       <th>Receiver</th>
       <th>Origin → Dest</th>
@@ -1073,28 +1292,34 @@ function renderShipmentsTable() {
       <th></th>
     </tr></thead>
     <tbody>${filtered.length ? filtered.map((s)=>`<tr>
-      <td><span class="mono" style="font-weight:600;color:var(--accent3);background:var(--accent2);padding:3px 8px;border-radius:5px;white-space:nowrap;">${s.shipcode||s.id}</span></td>
-      <td class="mono" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${s.invoice}">${s.invoice}</td>
-      <td style="font-size:12px;white-space:nowrap;">${s.sender||'-'}</td>
-      <td style="font-size:13px;font-weight:500;white-space:nowrap;">${s.customer}</td>
-      <td style="font-size:12px;white-space:nowrap;">${s.origin} → ${s.dest}</td>
-      <td><span class="badge ${modeColor(s.mode)}" style="font-size:10px;">${s.mode.replace('Export','Exp').replace('Import','Imp')}</span></td>
-      <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;" title="${s.sku}">${s.sku}</td>
+      <td><span class="mono" style="font-weight:600;color:var(--accent3);background:var(--accent2);padding:3px 8px;border-radius:5px;white-space:nowrap;">${simplifyShipmentCode(s.shipcode||s.id)}</span></td>
+      <td class="mono" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${s.invoice || ''}">${s.invoice || '-'}</td>
+      <td style="font-size:13px;font-weight:500;white-space:nowrap;">${getShipmentCustomerName(s) || '-'}</td>
+      <td style="font-size:12px;white-space:nowrap;">${getShipmentShipperName(s) || '-'}</td>
+      <td style="font-size:12px;white-space:nowrap;">${getShipmentReceiverName(s) || '-'}</td>
+      <td style="font-size:12px;white-space:nowrap;">${s.origin || '-'} → ${s.dest || '-'}</td>
+      <td><span class="badge ${modeColor(s.mode)}" style="font-size:10px;">${(s.mode || '').replace('Export','Exp').replace('Import','Imp')}</span></td>
+      <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;" title="${s.sku || ''}">${s.sku || '-'}</td>
       <td class="mono" style="font-size:12px;white-space:nowrap;">${s.pickup||'-'}</td>
       <td class="mono" style="font-size:12px;white-space:nowrap;">${s.eta||'-'}</td>
       <td><span class="badge ${statusColor(s.status)}">${s.status}</span></td>
-      <td><span class="badge ${quoteColor(s.quotestatus)}">${s.quotestatus||'Not Sent'}</span></td>
+      <td>
+        <span class="badge ${quoteColor(s.quotestatus)}">${s.quotestatus||'Not Sent'}</span>
+        ${s.relatedQuoteId ? `<div class="mono" style="font-size:10px;color:var(--accent3);margin-top:4px;">${s.relatedQuoteId}</div>` : ''}
+      </td>
       <td><span class="badge ${s.billing==='Done'?'badge-green':s.billing==='Sent'?'badge-blue':'badge-amber'}">${s.billing||'Pending'}</span></td>
       <td style="white-space:nowrap;">
         <button class="btn" style="padding:4px 10px;font-size:11px;" onclick="editShipment(${shipments.indexOf(s)})">Edit</button>
+        <button class="btn" style="padding:4px 10px;font-size:11px;" onclick="viewLinkedQuoteFromShipment(${shipments.indexOf(s)})">${s.relatedQuoteId ? 'View Quote' : 'Create Quote'}</button>
       </td>
-    </tr>`).join('') : `<tr><td colspan="13" class="empty">No shipments found</td></tr>`}</tbody>`;
+    </tr>`).join('') : `<tr><td colspan="14" class="empty">No shipments found</td></tr>`}</tbody>`;
 }
 
 function openNewShipment() {
   editIdx = -1;
   document.getElementById('modal-ship-title').textContent = 'New Shipment';
-  ['s-shipcode','s-invoice','s-po','s-customer','s-sender','s-origin','s-dest','s-units','s-sku','s-remarks','s-carrier','s-shipcost'].forEach(id=>{document.getElementById(id).value='';});
+  ['s-invoice','s-po','s-customer','s-sender','s-receiver','s-origin','s-dest','s-units','s-sku','s-remarks','s-carrier','s-shipcost'].forEach(id=>{document.getElementById(id).value='';});
+  document.getElementById('s-shipcode').value = getNextShipmentCode();
   ['s-invdate','s-pickup','s-eta'].forEach(id=>{document.getElementById(id).value='';});
   document.getElementById('s-status').value='Planning';
   document.getElementById('s-quotestatus').value='Not Sent';
@@ -1105,11 +1330,12 @@ function editShipment(idx) {
   editIdx = idx;
   const s = shipments[idx];
   document.getElementById('modal-ship-title').textContent = 'Edit Shipment';
-  document.getElementById('s-shipcode').value = s.shipcode||'';
+  document.getElementById('s-shipcode').value = simplifyShipmentCode(s.shipcode||'');
   document.getElementById('s-invoice').value = s.invoice||'';
   document.getElementById('s-po').value = s.po||'';
-  document.getElementById('s-customer').value = s.customer||'';
-  document.getElementById('s-sender').value = s.sender||'';
+  document.getElementById('s-customer').value = getShipmentCustomerName(s)||'';
+  document.getElementById('s-sender').value = getShipmentShipperName(s)||'';
+  document.getElementById('s-receiver').value = getShipmentReceiverName(s)||'';
   document.getElementById('s-origin').value = s.origin||'';
   document.getElementById('s-dest').value = s.dest||'';
   document.getElementById('s-units').value = s.units||'';
@@ -1129,17 +1355,21 @@ function editShipment(idx) {
   openModal('modal-shipment');
 }
 async function saveShipment() {
-  const code = document.getElementById('s-shipcode').value.trim();
-  if(!code) { alert('Please enter a Shipment Code.'); document.getElementById('s-shipcode').focus(); return; }
-  if(editIdx<0 && shipments.some(s=>s.shipcode===code)) { alert(`Shipment Code "${code}" already exists.`); return; }
+  const code = simplifyShipmentCode(document.getElementById('s-shipcode').value);
+  document.getElementById('s-shipcode').value = code;
+  if(!code) { alert('Please enter a Shipment Number.'); document.getElementById('s-shipcode').focus(); return; }
+  if(shipments.some((s, idx)=> idx !== editIdx && simplifyShipmentCode(s.shipcode) === code)) { alert(`Shipment Number "${code}" already exists.`); return; }
   const s = {
     id: editIdx>=0 ? shipments[editIdx].id : 'SHP'+Date.now(),
     _dbid: editIdx>=0 ? shipments[editIdx]._dbid : undefined,
     shipcode: code,
     invoice: document.getElementById('s-invoice').value,
     po: document.getElementById('s-po').value,
-    customer: document.getElementById('s-customer').value,
-    sender: document.getElementById('s-sender').value,
+    customerName: document.getElementById('s-customer').value.trim(),
+    customer: document.getElementById('s-customer').value.trim(),
+    shipper: document.getElementById('s-sender').value.trim(),
+    sender: document.getElementById('s-sender').value.trim(),
+    receiver: document.getElementById('s-receiver').value.trim(),
     origin: document.getElementById('s-origin').value,
     dest: document.getElementById('s-dest').value,
     mode: document.getElementById('s-mode').value,
@@ -1156,18 +1386,22 @@ async function saveShipment() {
     shipcost: document.getElementById('s-shipcost').value,
     currency: document.getElementById('s-currency').value,
     remarks: document.getElementById('s-remarks').value,
-    delivery: editIdx>=0 ? shipments[editIdx].delivery||'' : ''
+    delivery: editIdx>=0 ? shipments[editIdx].delivery||'' : '',
+    relatedQuoteId: editIdx>=0 ? shipments[editIdx].relatedQuoteId||'' : '',
+    relatedQuoteDbid: editIdx>=0 ? shipments[editIdx].relatedQuoteDbid||'' : '',
+    relatedQuoteDate: editIdx>=0 ? shipments[editIdx].relatedQuoteDate||'' : ''
   };
   try {
     showToast('Saving…', 'info');
-    if (s._dbid) { await dbUpdate('shipments', s); shipments[editIdx]=s; }
-    else { await dbInsert('shipments', s); shipments.push(s); }
+    if (s._dbid) { await dbUpdate('shipments', s); shipments[editIdx]=normalizeShipmentRecord(s); }
+    else { await dbInsert('shipments', s); shipments.push(normalizeShipmentRecord(s)); }
     _saveLocal();
     showToast('Shipment saved ✓', 'success');
   } catch(e) { return; }
   closeModal('modal-shipment');
   renderShipmentsTable();
   renderDashboard();
+  populateQuoteShipmentSelect(activeQuoteShipmentLink || '');
 }
 
 // ─── QUOTE BUILDER (DYNAMIC) ──────────────────────────────────────────────────
@@ -1420,6 +1654,211 @@ function updateQuoteTotals() {
 
 let activeQuoteDbid = null;
 let activeQuoteId = null;
+let activeQuoteShipmentLink = '';
+
+function shipmentLinkValue(s) {
+  if(!s) return '';
+  if(s._dbid) return `db:${s._dbid}`;
+  if(s.id) return `id:${s.id}`;
+  if(s.shipcode) return `code:${s.shipcode}`;
+  return '';
+}
+
+function findShipmentIndexByLink(linkValue) {
+  if(!linkValue) return -1;
+  if(linkValue.startsWith('db:')) return shipments.findIndex(s => s._dbid === linkValue.slice(3));
+  if(linkValue.startsWith('id:')) return shipments.findIndex(s => s.id === linkValue.slice(3));
+  if(linkValue.startsWith('code:')) return shipments.findIndex(s => s.shipcode === linkValue.slice(5));
+  return -1;
+}
+
+function findShipmentByLink(linkValue) {
+  const idx = findShipmentIndexByLink(linkValue);
+  return idx >= 0 ? shipments[idx] : null;
+}
+
+function findLinkedQuoteIndexForShipment(shipment) {
+  if(!shipment) return -1;
+  return quotes.findIndex(q => (shipment.relatedQuoteDbid && q._dbid === shipment.relatedQuoteDbid) || (shipment.relatedQuoteId && q.id === shipment.relatedQuoteId));
+}
+
+function getQuoteShipmentSearchLabel(s) {
+  if(!s) return '';
+  return `${simplifyShipmentCode(s.shipcode || s.id || 'Shipment')} — ${getShipmentCustomerName(s) || '-'} — ${s.origin || '-'} → ${s.dest || '-'}`;
+}
+
+function syncQuoteShipmentSearchInput(linkValue = '') {
+  const input = document.getElementById('q-shipment-search');
+  if(!input) return;
+  const s = findShipmentByLink(linkValue || activeQuoteShipmentLink || '');
+  input.value = s ? getQuoteShipmentSearchLabel(s) : '';
+}
+
+function renderQuoteShipmentSearchResults(query = '') {
+  const box = document.getElementById('q-shipment-results');
+  if(!box) return;
+  const q = (query || '').trim().toLowerCase();
+  const sorted = [...shipments].sort((a,b)=>(b.pickup||'').localeCompare(a.pickup||''));
+  const matched = q ? sorted.filter(s => {
+    const hay = [s.shipcode, s.id, s.invoice, s.origin, s.dest, s.mode, getShipmentCustomerName(s), getShipmentShipperName(s), getShipmentReceiverName(s)].filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(q);
+  }) : sorted.slice(0, 12);
+
+  if(!matched.length) {
+    box.innerHTML = '<div class="q-search-empty">No matching shipment found</div>';
+    box.style.display = 'block';
+    return;
+  }
+
+  box.innerHTML = matched.map(s => `
+    <div class="q-search-item" onclick="selectQuoteShipment('${shipmentLinkValue(s).replace(/'/g, "\\'")}')">
+      <div class="q-search-main">${simplifyShipmentCode(s.shipcode || s.id || 'Shipment')} — ${getShipmentCustomerName(s) || '-'}</div>
+      <div class="q-search-sub">Shipper: ${getShipmentShipperName(s) || '-'} · Receiver: ${getShipmentReceiverName(s) || '-'} · Invoice: ${s.invoice || '-'} · ${s.origin || '-'} → ${s.dest || '-'} · ${s.mode || '-'}</div>
+    </div>
+  `).join('');
+  box.style.display = 'block';
+}
+
+function filterQuoteShipmentSearch() {
+  const input = document.getElementById('q-shipment-search');
+  if(!input) return;
+  renderQuoteShipmentSearchResults(input.value || '');
+}
+
+function populateQuoteShipmentSelect(preserveValue = '') {
+  const sel = document.getElementById('q-shipment-select');
+  if(!sel) return;
+  const current = preserveValue || sel.value || activeQuoteShipmentLink || '';
+  sel.innerHTML = '<option value="">— Standalone Quote —</option>';
+  [...shipments].sort((a,b)=>(b.pickup||'').localeCompare(a.pickup||'')).forEach(s => {
+    const val = shipmentLinkValue(s);
+    const o = document.createElement('option');
+    o.value = val;
+    o.text = getQuoteShipmentSearchLabel(s);
+    sel.appendChild(o);
+  });
+  if(current && [...sel.options].some(o => o.value === current)) sel.value = current;
+  syncQuoteShipmentSearchInput(sel.value || current);
+  updateQuoteShipmentInfo();
+}
+
+function updateQuoteShipmentInfo() {
+  const box = document.getElementById('q-shipment-info');
+  const sel = document.getElementById('q-shipment-select');
+  if(!box || !sel) return;
+  syncQuoteShipmentSearchInput(sel.value || activeQuoteShipmentLink);
+  const s = findShipmentByLink(sel.value || activeQuoteShipmentLink);
+  if(!s) {
+    box.style.display = 'none';
+    box.innerHTML = '';
+    return;
+  }
+  const linkedQuote = findLinkedQuoteIndexForShipment(s) >= 0 ? quotes[findLinkedQuoteIndexForShipment(s)] : null;
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <div>
+        <div style="font-weight:600;color:var(--text);margin-bottom:3px;">Linked shipment: <span class="mono" style="color:var(--accent3);">${simplifyShipmentCode(s.shipcode || s.id || '-')}</span></div>
+        <div>Customer: ${getShipmentCustomerName(s) || '-'} · Shipper: ${getShipmentShipperName(s) || '-'} · Receiver: ${getShipmentReceiverName(s) || '-'} · Invoice: <span class="mono">${s.invoice || '-'}</span></div>
+        <div style="margin-top:3px;">${s.origin || '-'} → ${s.dest || '-'} · ${s.mode || '-'}</div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);">
+        Current shipment quote status: <span class="badge ${quoteColor(s.quotestatus)}" style="vertical-align:middle;">${s.quotestatus || 'Not Sent'}</span>
+        ${linkedQuote ? `<div style="margin-top:4px;">Linked quote: <span class="mono">${linkedQuote.id || '-'}</span></div>` : ''}
+      </div>
+    </div>`;
+}
+
+function selectQuoteShipment(linkValue, options = {}) {
+  const sel = document.getElementById('q-shipment-select');
+  const resultBox = document.getElementById('q-shipment-results');
+  if(sel && sel.value !== linkValue) sel.value = linkValue || '';
+  activeQuoteShipmentLink = linkValue || '';
+  syncQuoteShipmentSearchInput(linkValue || '');
+  if(resultBox) resultBox.style.display = 'none';
+  updateQuoteShipmentInfo();
+  const s = findShipmentByLink(linkValue);
+  if(!s) return;
+  document.getElementById('q-customer').value = getShipmentCustomerName(s) || document.getElementById('q-customer').value || '';
+  document.getElementById('q-route').value = `${s.origin || ''}${(s.origin || s.dest) ? ' → ' : ''}${s.dest || ''}`;
+  document.getElementById('q-mode').value = s.mode || document.getElementById('q-mode').value;
+  if(s.currency) document.getElementById('q-currency').value = s.currency;
+  if(options.applyPreset !== false) loadPreset((s.mode || '').toLowerCase().includes('air') ? 'air' : 'sea');
+  updateCurrencyLabels();
+}
+
+function clearQuoteShipmentLink() {
+  const sel = document.getElementById('q-shipment-select');
+  const input = document.getElementById('q-shipment-search');
+  const resultBox = document.getElementById('q-shipment-results');
+  if(sel) sel.value = '';
+  if(input) input.value = '';
+  if(resultBox) resultBox.style.display = 'none';
+  activeQuoteShipmentLink = '';
+  updateQuoteShipmentInfo();
+}
+
+async function updateShipmentRecordAt(idx, updatedShipment) {
+  if(idx < 0 || !updatedShipment) return;
+  try {
+    if(updatedShipment._dbid) await dbUpdate('shipments', updatedShipment);
+    shipments[idx] = updatedShipment;
+    _saveLocal();
+  } catch(e) {}
+}
+
+async function syncShipmentQuoteLink(oldLinkValue, newLinkValue, quoteRecord) {
+  if(oldLinkValue && oldLinkValue !== newLinkValue) {
+    const oldIdx = findShipmentIndexByLink(oldLinkValue);
+    if(oldIdx >= 0) {
+      const oldS = {...shipments[oldIdx]};
+      if((quoteRecord._dbid && oldS.relatedQuoteDbid === quoteRecord._dbid) || (quoteRecord.id && oldS.relatedQuoteId === quoteRecord.id)) {
+        oldS.relatedQuoteId = '';
+        oldS.relatedQuoteDbid = '';
+        oldS.relatedQuoteDate = '';
+        if(oldS.quotestatus !== 'Accepted') oldS.quotestatus = 'Not Sent';
+        await updateShipmentRecordAt(oldIdx, oldS);
+      }
+    }
+  }
+  if(newLinkValue) {
+    const idx = findShipmentIndexByLink(newLinkValue);
+    if(idx >= 0) {
+      const s = {...shipments[idx]};
+      s.relatedQuoteId = quoteRecord.id || '';
+      s.relatedQuoteDbid = quoteRecord._dbid || '';
+      s.relatedQuoteDate = quoteRecord.date || '';
+      if(s.quotestatus !== 'Accepted') s.quotestatus = 'Sent';
+      await updateShipmentRecordAt(idx, s);
+    }
+  }
+  renderShipmentsTable();
+  renderDashboard();
+  populateQuoteShipmentSelect(newLinkValue || '');
+}
+
+function openQuoteBuilderForShipment(idx) {
+  const s = shipments[idx];
+  if(!s) return;
+  showPage('quotes', document.querySelectorAll('.nav-tab')[2]);
+  resetQuoteBuilder();
+  populateQuoteShipmentSelect();
+  selectQuoteShipment(shipmentLinkValue(s));
+  showQuoteTab('builder', document.querySelectorAll('#page-quotes .page-tab')[0]);
+  showToast(`Shipment ${s.shipcode || s.id} linked to quote builder`, 'success');
+}
+
+function viewLinkedQuoteFromShipment(idx) {
+  const s = shipments[idx];
+  if(!s) return;
+  const qIdx = findLinkedQuoteIndexForShipment(s);
+  if(qIdx >= 0) {
+    showPage('quotes', document.querySelectorAll('.nav-tab')[2]);
+    loadSavedQuote(qIdx);
+    return;
+  }
+  openQuoteBuilderForShipment(idx);
+}
 
 function showQuoteTab(tab, el) {
   document.querySelectorAll('#page-quotes .page-tab').forEach(t=>t.classList.remove('active'));
@@ -1447,6 +1886,7 @@ function setQuoteEditBanner() {
 function resetQuoteBuilder() {
   activeQuoteDbid = null;
   activeQuoteId = null;
+  activeQuoteShipmentLink = '';
   document.getElementById('q-customer').value = '';
   document.getElementById('q-route').value = '';
   document.getElementById('q-boxes').value = 100;
@@ -1454,7 +1894,10 @@ function resetQuoteBuilder() {
   document.getElementById('q-cbm').value = 1;
   document.getElementById('q-currency').value = 'INR';
   document.getElementById('q-mode').value = 'Sea Export LCL';
+  const sel = document.getElementById('q-shipment-select');
+  if(sel) sel.value = '';
   loadPreset('sea');
+  populateQuoteShipmentSelect('');
   updateCurrencyLabels();
   setQuoteEditBanner();
 }
@@ -1462,6 +1905,7 @@ function resetQuoteBuilder() {
 function fillQuoteBuilderFromRecord(q) {
   activeQuoteDbid = q._dbid || null;
   activeQuoteId = q.id || null;
+  activeQuoteShipmentLink = q.shipmentDbid ? `db:${q.shipmentDbid}` : (q.shipmentId ? `id:${q.shipmentId}` : (q.shipcode ? `code:${q.shipcode}` : ''));
   document.getElementById('q-customer').value = q.customer || '';
   document.getElementById('q-route').value = q.route || '';
   document.getElementById('q-boxes').value = q.boxes || 0;
@@ -1469,6 +1913,7 @@ function fillQuoteBuilderFromRecord(q) {
   document.getElementById('q-cbm').value = q.cbm || 1;
   document.getElementById('q-currency').value = q.currency || 'INR';
   document.getElementById('q-mode').value = q.mode || 'Sea Export LCL';
+  populateQuoteShipmentSelect(activeQuoteShipmentLink);
   qLineId = 0;
   quoteLines = (q.lines || []).map(l => ({
     id: ++qLineId,
@@ -1481,6 +1926,7 @@ function fillQuoteBuilderFromRecord(q) {
   }));
   renderQuoteLines();
   updateCurrencyLabels();
+  updateQuoteShipmentInfo();
   setQuoteEditBanner();
 }
 
@@ -1497,8 +1943,10 @@ async function deleteSavedQuote(idx) {
   if(!q) return;
   if(!confirm(`Delete quotation ${q.id || ''} for ${q.customer || 'customer'}?`)) return;
   try {
+    const qLink = q.shipmentDbid ? `db:${q.shipmentDbid}` : (q.shipmentId ? `id:${q.shipmentId}` : (q.shipcode ? `code:${q.shipcode}` : ''));
     if(q._dbid) await dbDeleteRow('quotes', q._dbid);
     quotes.splice(idx, 1);
+    if(qLink) await syncShipmentQuoteLink(qLink, '', q);
     _saveLocal();
     if(activeQuoteDbid && q._dbid === activeQuoteDbid) resetQuoteBuilder();
     renderQuotesHistory();
@@ -1555,6 +2003,7 @@ function renderQuotesHistory() {
     <thead><tr>
       <th>Date</th>
       <th>Quote ID</th>
+      <th>Linked Shipment</th>
       <th>Customer</th>
       <th>Route</th>
       <th>Mode</th>
@@ -1568,6 +2017,7 @@ function renderQuotesHistory() {
       return `<tr>
         <td class="mono">${q.date || '-'}</td>
         <td class="mono">${q.id || '-'}</td>
+        <td>${q.shipcode ? `<span class="mono" style="font-weight:600;color:var(--accent3);">${simplifyShipmentCode(q.shipcode)}</span><div style="font-size:11px;color:var(--text3);margin-top:2px;">${q.shipmentInvoice || q.shipmentId || ''}</div>` : '<span style="color:var(--text3);">—</span>'}</td>
         <td style="font-weight:500;white-space:nowrap;">${q.customer || '-'}</td>
         <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${q.route || ''}">${q.route || '-'}</td>
         <td style="white-space:nowrap;">${q.mode || '-'}</td>
@@ -1580,7 +2030,7 @@ function renderQuotesHistory() {
           <button class="btn btn-xs" onclick="deleteSavedQuote(${realIdx})" style="color:var(--danger);">Delete</button>
         </td>
       </tr>`;
-    }).join('') : `<tr><td colspan="9" class="empty">No saved quotations found</td></tr>`}</tbody>`;
+    }).join('') : `<tr><td colspan="10" class="empty">No saved quotations found</td></tr>`}</tbody>`;
 }
 
 function renderQuoteLines() {
@@ -1626,6 +2076,8 @@ function recalcQuote() { updateUnitQtyForType(); }
 
 async function saveQuote() {
   const cust = document.getElementById('q-customer').value||'Unknown';
+  const selectedShipmentLink = document.getElementById('q-shipment-select')?.value || '';
+  const linkedShipment = findShipmentByLink(selectedShipmentLink);
   let shipTotal=0, custTotal=0;
   quoteLines.forEach(l=>{shipTotal+=(+l.shipperRate||0)*(+l.shipperQty||1);custTotal+=(+l.customerRate||0)*(+l.customerQty||1);});
   const q = {
@@ -1637,6 +2089,10 @@ async function saveQuote() {
     kg: document.getElementById('q-kg').value,
     cbm: document.getElementById('q-cbm').value,
     currency: document.getElementById('q-currency').value,
+    shipmentId: linkedShipment?.id || '',
+    shipmentDbid: linkedShipment?._dbid || '',
+    shipcode: simplifyShipmentCode(linkedShipment?.shipcode || ''),
+    shipmentInvoice: linkedShipment?.invoice || '',
     lines: JSON.parse(JSON.stringify(quoteLines)),
     shipperTotal: shipTotal, customerTotal: custTotal, margin: custTotal - shipTotal
   };
@@ -1656,8 +2112,11 @@ async function saveQuote() {
       activeQuoteId = q.id;
       showToast('Quote saved ✓', 'success');
     }
+    await syncShipmentQuoteLink(activeQuoteShipmentLink, selectedShipmentLink, q);
+    activeQuoteShipmentLink = selectedShipmentLink;
     _saveLocal();
     setQuoteEditBanner();
+    updateQuoteShipmentInfo();
     renderQuotesHistory();
   } catch(e) { return; }
 }
@@ -1669,6 +2128,7 @@ function printQuote() {
   const kg = document.getElementById('q-kg').value;
   const mode = document.getElementById('q-mode').value;
   const currency = document.getElementById('q-currency').value||'INR';
+  const linkedShipment = findShipmentByLink(document.getElementById('q-shipment-select')?.value || activeQuoteShipmentLink || '');
   let custTotal=0;
   quoteLines.forEach(l=>{custTotal+=(+l.customerRate||0)*(+l.customerQty||1);});
   const rows = quoteLines.filter(l=>(+l.customerRate||0)>0).map(l=>{
@@ -1684,6 +2144,7 @@ function printQuote() {
   </style></head><body>
     <h2>INEXT FREIGHT - CUSTOMER QUOTATION</h2>
     <p><b>Customer:</b> ${cust} &nbsp;&nbsp; <b>Route:</b> ${route} &nbsp;&nbsp; <b>Mode:</b> ${mode}</p>
+    ${linkedShipment ? `<p><b>Linked Shipment:</b> ${simplifyShipmentCode(linkedShipment.shipcode || linkedShipment.id || '-')} &nbsp;&nbsp; <b>Shipment Invoice:</b> ${linkedShipment.invoice || '-'}</p>` : ''}
     <p><b>Boxes:</b> ${boxes} &nbsp;&nbsp; <b>Weight:</b> ${kg} KG &nbsp;&nbsp; <b>Date:</b> ${new Date().toLocaleDateString()}</p>
     <table><thead><tr><th>Service Type</th><th>Rate</th><th>Unit/CBM</th><th>Total</th></tr></thead>
     <tbody>${rows}</tbody>
@@ -1697,13 +2158,77 @@ function printQuote() {
 // ─── INVOICES ─────────────────────────────────────────────────────────────────
 function populateInvSelect() {
   const sel = document.getElementById('inv-shipment-sel');
+  if(!sel) return;
+  const current = sel.value || '';
   sel.innerHTML = '<option value="">-- Select Shipment --</option>';
-  shipments.forEach((s,i)=>{
-    const o=document.createElement('option');
-    o.value=i;
-    o.text=`${s.invoice} – ${s.customer} (${s.origin}→${s.dest})`;
+  [...shipments].sort((a,b)=>(b.pickup||'').localeCompare(a.pickup||'')).forEach((s) => {
+    const idx = shipments.indexOf(s);
+    const o = document.createElement('option');
+    o.value = idx;
+    o.text = `${simplifyShipmentCode(s.shipcode || s.id || '')} – ${s.invoice || '-'} – ${getShipmentCustomerName(s) || '-'} – ${getShipmentReceiverName(s) || '-'}`;
     sel.appendChild(o);
   });
+  if(current && [...sel.options].some(o => o.value === current)) sel.value = current;
+  syncInvoiceShipmentSearchInput();
+}
+
+function getInvoiceShipmentSearchLabel(s) {
+  if(!s) return '';
+  return `${simplifyShipmentCode(s.shipcode || s.id || '')} — ${s.invoice || '-'} — ${getShipmentCustomerName(s) || '-'}`;
+}
+
+function syncInvoiceShipmentSearchInput() {
+  const input = document.getElementById('inv-shipment-search');
+  const sel = document.getElementById('inv-shipment-sel');
+  if(!input || !sel) return;
+  const idx = sel.value;
+  input.value = idx === '' ? '' : getInvoiceShipmentSearchLabel(shipments[+idx]);
+}
+
+function renderInvoiceShipmentSearchResults(query = '') {
+  const box = document.getElementById('inv-shipment-results');
+  if(!box) return;
+  const q = (query || '').trim().toLowerCase();
+  const matched = [...shipments].sort((a,b)=>(b.pickup||'').localeCompare(a.pickup||'')).filter(s => {
+    if(!q) return true;
+    const hay = [
+      s.shipcode, s.id, s.invoice, s.origin, s.dest, s.mode,
+      getShipmentCustomerName(s), getShipmentShipperName(s), getShipmentReceiverName(s)
+    ].filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(q);
+  }).slice(0, 12);
+
+  if(!matched.length) {
+    box.innerHTML = '<div class="q-search-empty">No matching shipment found</div>';
+    box.style.display = 'block';
+    return;
+  }
+
+  box.innerHTML = matched.map(s => {
+    const idx = shipments.indexOf(s);
+    return `
+      <div class="q-search-item" onclick="selectInvoiceShipment('${idx}')">
+        <div class="q-search-main">${simplifyShipmentCode(s.shipcode || s.id || '')} — ${s.invoice || '-'}</div>
+        <div class="q-search-sub">Customer: ${getShipmentCustomerName(s) || '-'} · Shipper: ${getShipmentShipperName(s) || '-'} · Receiver: ${getShipmentReceiverName(s) || '-'} · ${s.origin || '-'} → ${s.dest || '-'}</div>
+      </div>`;
+  }).join('');
+  box.style.display = 'block';
+}
+
+function filterInvoiceShipmentSearch() {
+  const input = document.getElementById('inv-shipment-search');
+  if(!input) return;
+  renderInvoiceShipmentSearchResults(input.value || '');
+}
+
+function selectInvoiceShipment(idx) {
+  const sel = document.getElementById('inv-shipment-sel');
+  const box = document.getElementById('inv-shipment-results');
+  if(!sel) return;
+  sel.value = idx;
+  syncInvoiceShipmentSearchInput();
+  if(box) box.style.display = 'none';
+  loadInvoiceShipment();
 }
 
 function loadInvoiceShipment() {
@@ -1915,6 +2440,20 @@ function fmtN(n) {
   if(Math.abs(num) >= 1000) return num.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
   return num.toFixed(2);
 }
+
+document.addEventListener('click', function(e) {
+  const quoteInput = document.getElementById('q-shipment-search');
+  const quoteBox = document.getElementById('q-shipment-results');
+  if(quoteInput && quoteBox && e.target !== quoteInput && !quoteBox.contains(e.target)) {
+    quoteBox.style.display = 'none';
+  }
+
+  const invInput = document.getElementById('inv-shipment-search');
+  const invBox = document.getElementById('inv-shipment-results');
+  if(invInput && invBox && e.target !== invInput && !invBox.contains(e.target)) {
+    invBox.style.display = 'none';
+  }
+});
 
 // Init
 document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-IN', {weekday:'long',year:'numeric',month:'long',day:'numeric'});
