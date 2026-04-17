@@ -725,8 +725,87 @@ function normalizeStageMap(stages, currentStage) {
   }
   return out;
 }
+// Convert various date formats to YYYY-MM-DD for <input type="date">
+function normDate(v) {
+  if (!v) return null;
+  v = String(v).trim();
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  // DD/MM/YYYY or DD-MM-YYYY
+  var m = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+  // MM/DD/YYYY
+  var m2 = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m2) { var d=new Date(v); if(!isNaN(d)) return d.toISOString().slice(0,10); }
+  // ISO string with time
+  if (v.length > 10 && v.indexOf('T') > -1) return v.slice(0,10);
+  return null;
+}
+
+// Map alternate/legacy field names to canonical names
+var FIELD_ALIASES = {
+  // customer
+  'client': 'customer_name', 'client_name': 'customer_name', 'party': 'customer_name',
+  // shipper
+  'sender': 'shipper_name', 'exporter': 'shipper_name',
+  // consignee
+  'receiver': 'consignee_name', 'importer': 'consignee_name',
+  // type
+  'type': 'shipment_type', 'shipment_type': 'shipment_type',
+  // ports
+  'origin': 'pol', 'origin_port': 'pol', 'loading_port': 'pol',
+  'destination': 'pod', 'dest': 'pod', 'discharge_port': 'pod', 'destination_port': 'pod',
+  // AWB/BL
+  'awb': 'mawb_hawb', 'hawb': 'mawb_hawb', 'mawb': 'mawb_hawb',
+  'bl': 'mbl_hbl', 'hbl': 'mbl_hbl', 'mbl': 'mbl_hbl',
+  // carrier
+  'carrier': 'airline_shipping_line', 'airline': 'airline_shipping_line', 'shipping_line': 'airline_shipping_line',
+  // weight/vol
+  'weight': 'gross_weight', 'chargeable': 'chargeable_weight', 'cbm': 'volume',
+  // finance
+  'invoice_amt': 'billing_amount', 'invoice_amount': 'billing_amount', 'billed_amount': 'billing_amount',
+  'vendor_amount': 'vendor_cost', 'buy_cost': 'vendor_cost',
+  'duty': 'duty_amount',
+  // dates
+  'date': 'shipment_date', 'invoice_date': 'shipment_date', 'booking_date': 'shipment_date',
+  'departure_date': 'actual_departure', 'arrival_date': 'actual_arrival',
+  'etd_date': 'etd', 'eta_date': 'eta',
+  // cha / vendor
+  'cha': 'cha_name', 'clearing_agent': 'cha_name',
+  'vendor': 'vendor_name', 'co_loader': 'vendor_name',
+  // status
+  'status': 'billing_status',
+  'remarks': 'remarks', 'notes': 'remarks', 'comment': 'remarks'
+};
+
+var DATE_FIELDS = ['shipment_date','etd','eta','actual_departure','actual_arrival','target_date'];
+
+function normalizeShipmentFields(s) {
+  if (!s) return s;
+  // Map alternate keys → canonical keys (only if canonical is missing/empty)
+  Object.keys(s).forEach(function(k) {
+    var canon = FIELD_ALIASES[k.toLowerCase()];
+    if (canon && canon !== k && (s[canon] === undefined || s[canon] === null || s[canon] === '')) {
+      s[canon] = s[k];
+    }
+  });
+  // Normalize all date fields to YYYY-MM-DD
+  DATE_FIELDS.forEach(function(f) {
+    if (s[f]) s[f] = normDate(s[f]);
+  });
+  // Normalize numeric fields
+  ['gross_weight','chargeable_weight','volume','packages','duty_amount','billing_amount','vendor_cost'].forEach(function(f) {
+    if (s[f] !== undefined && s[f] !== null && s[f] !== '') {
+      var n = Number(String(s[f]).replace(/[^0-9.]/g,''));
+      s[f] = isNaN(n) ? null : n;
+    }
+  });
+  return s;
+}
+
 function normalizeShipmentStages(s) {
   if (!s) return s;
+  normalizeShipmentFields(s);
   s.current_stage = normalizeStageId(s.current_stage);
   s.stages = normalizeStageMap(s.stages, s.current_stage);
   return s;
@@ -773,32 +852,37 @@ window.addEventListener('load', function() {
 async function connectDB() {
   try {
     sb = window.supabase.createClient(SB_URL, SB_KEY);
-    var test = await sb.from('shipments').select('id').limit(1);
-    if (test.error && test.error.code !== 'PGRST116') throw new Error(test.error.message);
     isLive = true;
+    // Show app immediately, load data in background
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
     document.getElementById('db-dot').classList.remove('off');
-    document.getElementById('db-lbl').textContent = 'Cloud Connected';
+    document.getElementById('db-lbl').textContent = 'Loading…';
+    renderAll();
     await loadAll();
+    document.getElementById('db-lbl').textContent = 'Cloud Connected';
     toast('Connected ✓', 'ok');
+    renderAll();
   } catch(e) {
     console.error('DB error:', e);
     isLive = false;
-    loadLocalCache();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
     document.getElementById('db-dot').classList.add('off');
-    document.getElementById('db-lbl').textContent = 'Local Draft Mode';
-    toast('Cloud not connected — using local browser storage', 'info');
+    document.getElementById('db-lbl').textContent = 'Offline Mode';
+    toast('Cloud error — ' + e.message, 'err');
+    renderAll();
   }
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
-  renderAll();
 }
 
 async function loadAll() {
   try {
-    var r1 = await sb.from('shipments').select('*').order('created_at',{ascending:false});
-    var r2 = await sb.from('quotations').select('*').order('created_at',{ascending:false});
-    var r3 = await sb.from('payments').select('*').order('created_at',{ascending:false});
-    var r4 = await sb.from('activity').select('*').order('created_at',{ascending:false}).limit(100);
+    var [r1, r2, r3, r4] = await Promise.all([
+      sb.from('shipments').select('*').order('created_at',{ascending:false}),
+      sb.from('quotations').select('*').order('created_at',{ascending:false}),
+      sb.from('payments').select('*').order('created_at',{ascending:false}),
+      sb.from('activity').select('*').order('created_at',{ascending:false}).limit(100)
+    ]);
     var r5 = { data: [] };
     try {
       r5 = await sb.from('customers').select('*').order('name',{ascending:true});
@@ -809,7 +893,6 @@ async function loadAll() {
     DB.pays  = r3.data || [];
     DB.acts  = r4.data || [];
     DB.custs = r5.data || [];
-    saveLocalCache();
   } catch(e) { toast('Load error: ' + e.message, 'err'); }
 }
 
@@ -817,13 +900,11 @@ async function dbI(tbl, row) {
   var store = storeFor(tbl);
   if (!isLive) {
     if (store) store.unshift(row);
-    saveLocalCache();
     return row;
   }
   var res = await sb.from(tbl).insert([row]).select().single();
   if (res.error) throw new Error(res.error.message);
   if (store) store.unshift(res.data);
-  saveLocalCache();
   return res.data;
 }
 async function dbU(tbl, row) {
@@ -831,14 +912,12 @@ async function dbU(tbl, row) {
   if (!isLive) {
     var i = store ? store.findIndex(function(x){ return x.id === row.id; }) : -1;
     if (i >= 0) store[i] = row;
-    saveLocalCache();
     return row;
   }
   var res = await sb.from(tbl).update(row).eq('id', row.id).select().single();
   if (res.error) throw new Error(res.error.message);
   var i2 = store ? store.findIndex(function(x){ return x.id === res.data.id; }) : -1;
   if (i2 >= 0) store[i2] = res.data;
-  saveLocalCache();
   return res.data;
 }
 async function dbD(tbl, id) {
@@ -849,7 +928,6 @@ async function dbD(tbl, id) {
       store.length = 0;
       filtered.forEach(function(x){ store.push(x); });
     }
-    saveLocalCache();
     return;
   }
   var res = await sb.from(tbl).delete().eq('id', id);
@@ -859,7 +937,6 @@ async function dbD(tbl, id) {
     store.length = 0;
     filtered2.forEach(function(x){ store.push(x); });
   }
-  saveLocalCache();
 }
 
 function normalizeCustomerName(name) {
@@ -1060,7 +1137,7 @@ function renderShips() {
   var today = new Date().toISOString().slice(0,10);
 
   var data = DB.ships.filter(function(s) {
-    if (q && !(s.job_number+' '+s.customer_name+' '+(s.mawb_hawb||'')+' '+(s.mbl_hbl||'')+' '+(s.invoice_number||'')+' '+(s.shipper_name||'')).toLowerCase().includes(q)) return false;
+    if (q && !(s.job_number+' '+s.customer_name+' '+(s.invoice_number||'')+' '+(s.shipper_name||'')+' '+(s.pol||'')+' '+(s.pod||'')+' '+(s.commodity||'')).toLowerCase().includes(q)) return false;
     if (type && s.shipment_type !== type) return false;
     if (mode && s.mode !== mode) return false;
     if (stage && s.current_stage !== stage) return false;
@@ -1082,33 +1159,28 @@ function renderShips() {
   if (sPage > pages) sPage = pages;
   var slice = data.slice((sPage-1)*PER, sPage*PER);
 
-  var H = ['job_number','shipment_date','customer_name','shipment_type','mode','pol','pod','mawb_hawb','current_stage','billing_amount','billing_status','payment_status','pod_status','eta','target_date'];
-  var HL = ['Job No.','Date','Customer','Type','Mode','POL','POD','AWB/BL','Stage','Billing','Invoice','Payment','POD','ETA','Target'];
+  var H = ['job_number','customer_name','shipment_date','invoice_number','shipper_name','pol','pod','mode','commodity','eta','current_stage','billing_status'];
+  var HL = ['Job Number','Customer Name','Date of Invoice','Invoice Number','Sender','Origin Country','Destination Country','Transport Mode','SKU Details','ETA','Status','Billing Status'];
   document.getElementById('ship-th').innerHTML = '<tr>' + H.map(function(h,i){
     return '<th onclick="setSort(\''+h+'\')">' + HL[i] + (sSort===h?(sDir==='asc'?' ▲':' ▼'):'') + '</th>';
-  }).join('') + '<th></th></tr>';
+  }).join('') + '</tr>';
 
   document.getElementById('ship-tb').innerHTML = slice.length ? slice.map(function(s) {
-    var od = s.target_date && s.target_date < today && s.current_stage !== 'file_closed';
-    return '<tr class="cr" onclick="openDet(\''+s.id+'\')" style="'+(od?'background:#fff1f2;':'')+'">'+
-      '<td><span class="mono" style="color:var(--green-b);font-weight:700">'+s.job_number+'</span></td>'+
+    return '<tr class="cr" onclick="openDet(\''+s.id+'\')">'+
+      '<td><span class="mono" style="color:var(--green-b);font-weight:700">'+(s.job_number||'—')+'</span></td>'+
+      '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;font-weight:600" title="'+esc(s.customer_name||'')+'">'+(s.customer_name||'—')+'</td>'+
       '<td class="mono" style="font-size:11px">'+(s.shipment_date||'—')+'</td>'+
-      '<td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;font-weight:600">'+(s.customer_name||'')+'</td>'+
-      '<td>'+typeTag(s.shipment_type)+'</td>'+
-      '<td>'+modeTag(s.mode)+'</td>'+
+      '<td class="mono" style="font-size:11px">'+(s.invoice_number||'—')+'</td>'+
+      '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis" title="'+esc(s.shipper_name||'')+'">'+(s.shipper_name||'—')+'</td>'+
       '<td style="font-size:12px">'+(s.pol||'—')+'</td>'+
       '<td style="font-size:12px">'+(s.pod||'—')+'</td>'+
-      '<td class="mono" style="font-size:11px">'+(s.mawb_hawb||s.mbl_hbl||'—')+'</td>'+
-      '<td style="font-size:11px;color:var(--t3)">'+slbl(s.current_stage)+'</td>'+
-      '<td class="mono" style="font-size:11px">'+(s.billing_amount?'₹'+fmt(s.billing_amount):'—')+'</td>'+
-      '<td>'+bbadge(s.billing_status)+'</td>'+
-      '<td>'+pbadge(s.payment_status)+'</td>'+
-      '<td>'+podbadge(s.pod_status)+'</td>'+
+      '<td>'+modeTag(s.mode)+'</td>'+
+      '<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis" title="'+esc(s.commodity||'')+'">'+(s.commodity||'—')+'</td>'+
       '<td class="mono" style="font-size:11px;'+(s.eta&&s.eta<today?'color:var(--red-b)':'')+'">'+(s.eta||'—')+'</td>'+
-      '<td class="mono" style="font-size:11px;'+(od?'color:var(--red-b);font-weight:700':'')+'">'+(s.target_date||'—')+'</td>'+
-      '<td onclick="event.stopPropagation()"><button class="btn btn-xs" onclick="openDet(\''+s.id+'\')">View</button></td>'+
+      '<td style="font-size:11px;color:var(--t3)">'+slbl(s.current_stage)+'</td>'+
+      '<td>'+bbadge(s.billing_status)+'</td>'+
       '</tr>';
-  }).join('') : '<tr><td colspan="16" class="t-empty">No shipments found</td></tr>';
+  }).join('') : '<tr><td colspan="12" class="t-empty">No shipments found</td></tr>';
 
   var pg = '<span>'+data.length+' records · Page '+sPage+'/'+pages+'</span>';
   if (sPage > 1) pg += '<div class="pgn-n" onclick="sPage--;renderShips()">‹</div>';
@@ -1501,7 +1573,8 @@ function buildShipForm(s) {
     } else if (f.t === 'ta') {
       inp = '<textarea class="fi" id="f_'+f.id+'" rows="3">'+esc(s[f.id]||'')+'</textarea>';
     } else {
-      inp = '<input class="fi" type="'+f.t+'" id="f_'+f.id+'" value="'+esc(s[f.id]||'')+'" placeholder="'+esc(f.ph||'')+'">';
+      var val = (f.t === 'date') ? (normDate(s[f.id]) || '') : esc(s[f.id] != null ? s[f.id] : '');
+      inp = '<input class="fi" type="'+f.t+'" id="f_'+f.id+'" value="'+val+'" placeholder="'+esc(f.ph||'')+'">';
     }
     return '<div class="fgi'+(f.span?' '+f.span:'')+'"><label class="fl">'+f.lbl+'</label>'+inp+'</div>';
   }).join('');
@@ -1976,9 +2049,9 @@ function gsearchRun(q) {
 
 // ── EXPORT ────────────────────────────────────────────────
 function exportCSV() {
-  var H = ['Job No.','Date','Customer','Type','Mode','POL','POD','AWB/BL','Stage','Billing Amt','Billing','Payment','POD Status'];
+  var H = ['Job Number','Customer Name','Date of Invoice','Invoice Number','Sender','Origin Country','Destination Country','Transport Mode','SKU Details','ETA','Status','Billing Status'];
   var rows = DB.ships.map(function(s) {
-    return [s.job_number,s.shipment_date,s.customer_name,s.shipment_type,s.mode,s.pol,s.pod,s.mawb_hawb||s.mbl_hbl,slbl(s.current_stage),s.billing_amount,s.billing_status,s.payment_status,s.pod_status];
+    return [s.job_number,s.customer_name,s.shipment_date,s.invoice_number,s.shipper_name,s.pol,s.pod,s.mode,s.commodity,s.eta,slbl(s.current_stage),s.billing_status];
   });
   var csv = [H].concat(rows).map(function(r){ return r.map(function(c){ return '"'+(c||'')+'"'; }).join(','); }).join('\n');
   var a = document.createElement('a');
