@@ -458,7 +458,7 @@ tr.row-intransit td:first-child { border-left: 3px solid var(--amber); }
         </div>
       </div>
       <div class="fb">
-        <input id="sf-q" placeholder="🔍 Job / Customer / AWB / Invoice…" style="min-width:220px">
+        <input id="sf-q" placeholder="🔍 Job / Customer / AWB / Commercial Invoice…" style="min-width:220px">
         <select id="sf-type"><option value="">All Types</option><option>Import</option><option>Export</option><option>Domestic</option></select>
         <select id="sf-mode"><option value="">All Modes</option><option>Air</option><option>Sea LCL</option><option>Sea FCL</option><option>Road</option></select>
         <select id="sf-stage"><option value="">All Stages</option></select>
@@ -544,7 +544,7 @@ tr.row-intransit td:first-child { border-left: 3px solid var(--amber); }
         <select id="docf-st"><option value="">All</option><option>Complete</option><option>Incomplete</option></select>
       </div>
       <div class="card"><div class="tw">
-        <table><thead><tr><th>Job No.</th><th>Customer</th><th>Mode</th><th>Checklist</th><th>CI</th><th>PL</th><th>KYC</th><th>GST/IEC</th><th>Ship Bill</th><th>Status</th><th></th></tr></thead>
+        <table><thead><tr><th>Job No.</th><th>Customer</th><th>Mode</th><th>Invoice / PL</th><th>Checklist</th><th>AWB / BL</th><th>Shipping Bill</th><th>BOE</th><th>Status</th><th></th></tr></thead>
         <tbody id="doc-tb"></tbody></table>
       </div></div>
     </div>
@@ -1106,13 +1106,51 @@ function nav(p) {
   var ni = document.getElementById('nav-' + p);
   if (ni) ni.classList.add('active');
   document.getElementById('tb-title').textContent = TITLES[p] || p;
+
+  if (p === 'dashboard') renderDash();
+  else if (p === 'shipments') renderShips();
+  else if (p === 'quotations') renderQuots();
+  else if (p === 'documentation') renderDocs();
+  else if (p === 'customs') renderCust();
+  else if (p === 'delivery') renderDel();
+  else if (p === 'billing') { renderBillMain(); renderBillMap(); }
+  else if (p === 'payments') renderPays();
+  else if (p === 'reports') renderRpt();
+  else if (p === 'settings') renderSettings();
 }
 
 // ── BADGES ────────────────────────────────────────────────
+var DOC_FIELDS = [
+  { id:'doc_invoice_pl', lbl:'Invoice / Packing List' },
+  { id:'doc_checklist', lbl:'Checklist' },
+  { id:'doc_awb_bl', lbl:'AWB / BL' },
+  { id:'doc_shipping_bill', lbl:'Shipping Bill' },
+  { id:'doc_boe', lbl:'BOE' }
+];
+function getDocFieldValue(s, k) {
+  if (!s) return false;
+  if (k === 'doc_invoice_pl') return !!(s.doc_ci && s.doc_pl);
+  if (k === 'doc_awb_bl') return !!s.doc_kyc;
+  if (k === 'doc_boe') return !!s.doc_gst_iec;
+  return !!s[k];
+}
+function setDocFieldValue(s, k, v) {
+  if (!s) return;
+  if (k === 'doc_invoice_pl') { s.doc_ci = !!v; s.doc_pl = !!v; return; }
+  if (k === 'doc_awb_bl') { s.doc_kyc = !!v; return; }
+  if (k === 'doc_boe') { s.doc_gst_iec = !!v; return; }
+  s[k] = !!v;
+}
+function isDocComplete(s) {
+  return DOC_FIELDS.every(function(d){ return getDocFieldValue(s, d.id); });
+}
+function hasPendingDocs(s) {
+  return !isDocComplete(s);
+}
 function updateBadges() {
   var s = DB.ships;
   document.getElementById('b-active').textContent = s.filter(function(x){ return x.current_stage !== 'file_closed'; }).length;
-  document.getElementById('b-docs').textContent = s.filter(function(x){ return !x.doc_checklist || !x.doc_ci || !x.doc_pl; }).length;
+  document.getElementById('b-docs').textContent = s.filter(function(x){ return hasPendingDocs(x); }).length;
   document.getElementById('b-pod').textContent = s.filter(function(x){ return x.pod_status === 'POD Pending' && SIDS.indexOf(x.current_stage) >= SIDS.indexOf('delivered'); }).length;
   document.getElementById('b-bill').textContent = s.filter(function(x){ return x.billing_status === 'Unbilled' && SIDS.indexOf(x.current_stage) >= SIDS.indexOf('delivered'); }).length;
   document.getElementById('b-pay').textContent = s.filter(function(x){ return x.payment_status === 'Pending' && x.billing_status === 'Billed'; }).length;
@@ -1125,7 +1163,7 @@ function renderDash() {
 
   var kd = [
     {key:'active', lbl:'Total Active', val:s.filter(function(x){return x.current_stage!=='file_closed';}).length, cls:'bl', sub:'in progress', hint:'Open shipments list'},
-    {key:'docs', lbl:'Pending Docs', val:s.filter(function(x){return !x.doc_checklist||!x.doc_ci||!x.doc_pl;}).length, cls:'am', sub:'need docs', hint:'Open incomplete documentation'},
+    {key:'docs', lbl:'Pending Docs', val:s.filter(function(x){return hasPendingDocs(x);}).length, cls:'am', sub:'need docs', hint:'Open incomplete documentation'},
     {key:'customs', lbl:'Customs Pending', val:s.filter(function(x){var i=SIDS.indexOf(x.current_stage);return i>=SIDS.indexOf('cargo_handed_over')&&i<SIDS.indexOf('customs_cleared');}).length, cls:'', sub:'awaiting clearance', hint:'Open customs view'},
     {key:'delivery', lbl:'Intransit', val:s.filter(function(x){return x.current_stage==='intransit';}).length, cls:'te', sub:'cargo moving', hint:'Open intransit shipments'},
     {key:'pod', lbl:'POD Pending', val:s.filter(function(x){return x.pod_status==='POD Pending'&&SIDS.indexOf(x.current_stage)>=SIDS.indexOf('delivered');}).length, cls:'am', sub:'awaiting proof', hint:'Open POD pending list'},
@@ -1210,7 +1248,7 @@ function renderShips() {
   var today = new Date().toISOString().slice(0,10);
 
   var data = DB.ships.filter(function(s) {
-    if (q && !(s.job_number+' '+s.customer_name+' '+(s.invoice_number||'')+' '+(s.shipper_name||'')+' '+(s.pol||'')+' '+(s.pod||'')+' '+(s.commodity||'')).toLowerCase().includes(q)) return false;
+    if (q && !(s.job_number+' '+s.customer_name+' '+(s.invoice_number||'')+' '+(s.consignee_name||'')+' '+(s.pol||'')+' '+(s.pod||'')+' '+(s.commodity||'')).toLowerCase().includes(q)) return false;
     if (type && s.shipment_type !== type) return false;
     if (mode && s.mode !== mode) return false;
     if (stage && s.current_stage !== stage) return false;
@@ -1232,8 +1270,8 @@ function renderShips() {
   if (sPage > pages) sPage = pages;
   var slice = data.slice((sPage-1)*PER, sPage*PER);
 
-  var H = ['job_number','customer_name','shipment_date','invoice_number','shipper_name','pol','pod','mode','commodity','eta','current_stage','invoice_currency','billing_status'];
-  var HL = ['Job Number','Customer Name','Invoice Date','Invoice No.','Sender','Origin','Destination','Mode','SKU','ETA','Status','Currency','Billing'];
+  var H = ['job_number','customer_name','shipment_date','invoice_number','consignee_name','pol','pod','mode','commodity','eta','current_stage','invoice_currency','billing_status'];
+  var HL = ['Job Number','Customer Name','Invoice Date','Commercial Invoice','Consignee','Origin','Destination','Mode','SKU','ETA','Status','Currency','Billing'];
   document.getElementById('ship-th').innerHTML = '<tr>' + H.map(function(h,i){
     return '<th onclick="setSort(\''+h+'\')">' + HL[i] + (sSort===h?(sDir==='asc'?' ▲':' ▼'):'') + '</th>';
   }).join('') + '</tr>';
@@ -1246,7 +1284,7 @@ function renderShips() {
       '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;font-weight:600" title="'+esc(s.customer_name||'')+'">'+(s.customer_name||'—')+'</td>'+
       '<td class="mono" style="font-size:11px">'+(s.shipment_date||'—')+'</td>'+
       '<td class="mono" style="font-size:11px">'+(s.invoice_number||'—')+'</td>'+
-      '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis" title="'+esc(s.shipper_name||'')+'">'+(s.shipper_name||'—')+'</td>'+
+      '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis" title="'+esc(s.consignee_name||'')+'">'+(s.consignee_name||'—')+'</td>'+
       '<td style="font-size:12px">'+(s.pol||'—')+'</td>'+
       '<td style="font-size:12px">'+(s.pod||'—')+'</td>'+
       '<td>'+modeTag(s.mode)+'</td>'+
@@ -1431,8 +1469,6 @@ async function markStage(sid, stageId) {
     if (!s.stages[SIDS[i]]) s.stages[SIDS[i]] = now;
   }
   s.current_stage = stageId;
-  if (stageId === 'invoice_packing_list_received') { s.doc_ci = true; s.doc_pl = true; }
-  if (stageId === 'checklist_filled') s.doc_checklist = true;
   if (stageId === 'pod_received') s.pod_status = 'POD Received';
   if (stageId === 'delivered' && s.pod_status === 'POD Pending') s.pod_status = 'Delivered';
   if (stageId === 'billed') s.billing_status = 'Billed';
@@ -1447,7 +1483,7 @@ async function markStage(sid, stageId) {
     toast((stg?stg.lbl:stageId)+' ✓', 'ok');
   } catch(e) { toast('Error: '+e.message, 'err'); return; }
 
-  renderSTL(s); renderSA(s); renderDetSidebar(s); updateBadges(); renderDash();
+  renderSTL(s); renderSA(s); renderDetSidebar(s); updateBadges(); renderDash(); renderDocs();
 }
 
 function renderDetTabs(s) {
@@ -1473,14 +1509,15 @@ function renderDetTabs(s) {
     '<div class="ig-item" style="grid-column:1/-1"><div class="ig-lbl">Remarks</div><div style="font-size:12px;color:var(--t2);background:var(--s2);border-radius:6px;padding:8px;min-height:36px">'+(s.remarks||'—')+'</div></div>' +
     '</div></div></div>';
 
-  var docs = [['doc_checklist','Checklist Filled'],['doc_ci','CI (Commercial Invoice)'],['doc_pl','PL (Packing List)'],['doc_kyc','KYC Received'],['doc_gst_iec','GST / IEC / AD Code'],['doc_shipping_bill','Shipping Bill / BOE']];
+
   document.getElementById('dt-docs').innerHTML =
-    '<div class="card"><div class="card-h"><span class="card-title">Document Checklist</span></div>' +
-    docs.map(function(d){
+    '<div class="card"><div class="card-h"><span class="card-title">Document Checklist</span><span style="font-size:11px;color:var(--t3)">Manual doc control — separate from shipment stages</span></div>' +
+    DOC_FIELDS.map(function(d){
+      var on = getDocFieldValue(s, d.id);
       return '<div class="cl-item">' +
-        '<div class="cl-chk '+(s[d[0]]?'on':'')+'" onclick="toggleDoc(\''+s.id+'\',\''+d[0]+'\')">'+(s[d[0]]?'✓':'')+'</div>' +
-        '<span class="cl-name '+(s[d[0]]?'on':'')+'">'+d[1]+'</span>' +
-        '<span class="cl-ts" style="color:'+(s[d[0]]?'var(--green-b)':'var(--t3)')+'">'+(s[d[0]]?'✓ Done':'Pending')+'</span>' +
+        '<div class="cl-chk '+(on?'on':'')+'" onclick="toggleDoc(\''+s.id+'\',\''+d.id+'\')">'+(on?'✓':'')+'</div>' +
+        '<span class="cl-name '+(on?'on':'')+'">'+d.lbl+'</span>' +
+        '<span class="cl-ts" style="color:'+(on?'var(--green-b)':'var(--t3)')+'">'+(on?'✓ Done':'Pending')+'</span>' +
         '</div>';
     }).join('') +
     '<div style="padding:12px;border-top:1px solid var(--b1)">' +
@@ -1580,16 +1617,34 @@ function dtab(t, el) {
 async function toggleDoc(sid, k) {
   var s = DB.ships.find(function(x){ return x.id===sid; });
   if (!s) return;
-  s[k] = !s[k];
-  try { await dbU('shipments', s); toast('Updated ✓','ok'); } catch(e) { toast('Error','err'); return; }
-  renderDetTabs(s); updateBadges();
+  setDocFieldValue(s, k, !getDocFieldValue(s, k));
+  try {
+    s = await dbU('shipments', s);
+    toast('Updated ✓','ok');
+  } catch(e) {
+    toast('Error: ' + e.message,'err');
+    return;
+  }
+  renderDetTabs(s);
+  renderDocs();
+  renderShips();
+  renderDash();
+  updateBadges();
 }
 async function saveDocRem(sid) {
   var s = DB.ships.find(function(x){ return x.id===sid; });
   if (!s) return;
   var el = document.getElementById('docrem_'+sid);
   s.doc_remarks = el ? el.value : '';
-  try { await dbU('shipments',s); toast('Saved ✓','ok'); } catch(e){ toast('Error','err'); }
+  try {
+    s = await dbU('shipments',s);
+    toast('Saved ✓','ok');
+  } catch(e){
+    toast('Error: ' + e.message,'err');
+    return;
+  }
+  renderDetTabs(s);
+  renderDocs();
 }
 
 // ── SHIP FORM ─────────────────────────────────────────────
@@ -1609,7 +1664,7 @@ var SF = [
   {id:'gross_weight',lbl:'Gross Weight (kg)',t:'number'},
   {id:'chargeable_weight',lbl:'Chargeable Weight (kg)',t:'number'},
   {id:'volume',lbl:'Volume (CBM)',t:'number'},
-  {id:'invoice_number',lbl:'Invoice Number',t:'text'},
+  {id:'invoice_number',lbl:'Commercial Invoice',t:'text'},
   {id:'mawb_hawb',lbl:'MAWB / HAWB',t:'text'},
   {id:'mbl_hbl',lbl:'MBL / HBL',t:'text'},
   {id:'airline_shipping_line',lbl:'Airline / Shipping Line',t:'text'},
@@ -1930,14 +1985,14 @@ function renderDocs() {
   var st = document.getElementById('docf-st').value||'';
   var data = DB.ships.filter(function(s) {
     if (q && (s.job_number+' '+s.customer_name).toLowerCase().indexOf(q)<0) return false;
-    var ok = s.doc_checklist && s.doc_ci && s.doc_pl && s.doc_kyc && s.doc_gst_iec;
+    var ok = isDocComplete(s);
     if (st==='Complete' && !ok) return false;
     if (st==='Incomplete' && ok) return false;
     return true;
   });
   function chk(v) { return v ? '<span class="badge b-gr">✓</span>' : '<span class="badge b-rd">✗</span>'; }
   document.getElementById('doc-tb').innerHTML = data.map(function(s) {
-    var ok = s.doc_checklist && s.doc_ci && s.doc_pl && s.doc_kyc && s.doc_gst_iec;
+    var ok = isDocComplete(s);
     return '<tr class="cr" onclick="openDet(\''+s.id+'\')">' +
       '<td class="mono" style="color:var(--green-b);font-weight:700">'+s.job_number+'</td>' +
       '<td>'+s.customer_name+'</td><td>'+modeTag(s.mode)+'</td>' +
@@ -2672,9 +2727,9 @@ function gsearchRun(q) {
 
 // ── EXPORT ────────────────────────────────────────────────
 function exportCSV() {
-  var H = ['Job Number','Customer Name','Date of Invoice','Invoice Number','Sender','Origin Country','Destination Country','Transport Mode','SKU Details','ETA','Status','Billing Status'];
+  var H = ['Job Number','Customer Name','Date of Invoice','Commercial Invoice','Consignee','Origin Country','Destination Country','Transport Mode','SKU Details','ETA','Status','Billing Status'];
   var rows = DB.ships.map(function(s) {
-    return [s.job_number,s.customer_name,s.shipment_date,s.invoice_number,s.shipper_name,s.pol,s.pod,s.mode,s.commodity,s.eta,slbl(s.current_stage),s.billing_status];
+    return [s.job_number,s.customer_name,s.shipment_date,s.invoice_number,s.consignee_name,s.pol,s.pod,s.mode,s.commodity,s.eta,slbl(s.current_stage),s.billing_status];
   });
   var csv = [H].concat(rows).map(function(r){ return r.map(function(c){ return '"'+(c||'')+'"'; }).join(','); }).join('\n');
   var a = document.createElement('a');
