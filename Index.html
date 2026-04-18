@@ -217,7 +217,7 @@ textarea.fi{resize:vertical;min-height:65px}
 .det-cust{font-size:14px;font-weight:700;margin-top:3px;color:var(--t1)}
 .det-route{font-size:12px;color:var(--t2);margin-top:2px}
 .det-badges{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
-.det-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px;padding-top:12px;border-top:1px solid var(--b1)}
+.det-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:10px 14px;margin-top:14px;padding-top:12px;border-top:1px solid var(--b1)}
 .dm-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:3px}
 .dm-val{font-size:12px;font-weight:600;color:var(--t1)}
 .dm-val.mo{font-family:'JetBrains Mono',monospace}
@@ -578,24 +578,29 @@ tr.row-intransit td:first-child { border-left: 3px solid var(--amber); }
     <!-- BILLING -->
     <div class="page" id="pg-billing">
       <div class="sh">
-        <div><div class="sh-title">Billing</div><div class="sh-sub">Invoices and billing status</div></div>
-        <button class="btn btn-p" onclick="openBillModal()">+ Add Invoice</button>
+        <div><div class="sh-title">Billing</div><div class="sh-sub">Logistics invoices raised to customer · Vendor invoices from your vendors</div></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-p" onclick="openBillModal()">+ Add / Edit Invoice</button>
+        </div>
       </div>
       <div class="tabs">
-        <div class="tab active" id="bill-tab-recv" onclick="billTab('recv',this)">Receivable (Customer)</div>
-        <div class="tab" id="bill-tab-pay" onclick="billTab('pay',this)">Payable (Vendor)</div>
-        <div class="tab" id="bill-tab-map" onclick="billTab('map',this)">📊 P&L Map</div>
+        <div class="tab active" id="bill-tab-main" onclick="billTab('main',this)">📋 All Invoices</div>
+        <div class="tab" id="bill-tab-map" onclick="billTab('map',this)">📊 P&amp;L Map</div>
       </div>
-      <div id="bill-recv-wrap">
+      <div id="bill-main-wrap">
         <div class="fb">
-          <input id="billf-q" placeholder="🔍 Search…">
-          <select id="billf-st"><option value="">All</option><option>Pending</option><option>Overdue</option><option>Paid</option></select>
+          <input id="billf-q" placeholder="🔍 Search job / customer / invoice…" style="min-width:240px">
+          <select id="billf-st">
+            <option value="">All Status</option>
+            <option value="logi-pending">Logistics — Pending</option>
+            <option value="logi-received">Logistics — Received</option>
+            <option value="vendor-unpaid">Vendor — Unpaid</option>
+            <option value="vendor-paid">Vendor — Paid</option>
+            <option value="no-logi">No Logistics Invoice</option>
+          </select>
+          <span class="fc" id="bill-main-count"></span>
         </div>
-        <div class="card"><div class="tw"><table id="bill-recv-t"></table></div></div>
-      </div>
-      <div id="bill-pay-wrap" style="display:none">
-        <div class="fb"><input id="billf-q2" placeholder="🔍 Search…"></div>
-        <div class="card"><div class="tw"><table id="bill-pay-t"></table></div></div>
+        <div class="card"><div class="tw"><table id="bill-main-t"></table></div></div>
       </div>
       <div id="bill-map-wrap" style="display:none">
         <div class="fb"><input id="billf-qmap" placeholder="🔍 Search job / customer…"><span class="fc" id="bill-map-count"></span></div>
@@ -651,7 +656,7 @@ tr.row-intransit td:first-child { border-left: 3px solid var(--amber); }
   </div>
 </div>
 <div class="mo" id="mo-bill">
-  <div class="mo-box sm">
+  <div class="mo-box" style="max-width:820px">
     <div class="mo-head"><div class="mo-title">Add Customer Invoice</div><button class="mo-x" onclick="closeMo('mo-bill')">×</button></div>
     <div class="mo-body" id="bill-form"></div>
     <div class="mo-foot"><button class="btn" onclick="closeMo('mo-bill')">Cancel</button><button class="btn btn-p" onclick="saveBill()">Save</button></div>
@@ -905,9 +910,8 @@ window.addEventListener('load', function() {
   ['docf-q','docf-st'].forEach(function(id){ var el=document.getElementById(id); if(el){el.addEventListener('input',renderDocs);el.addEventListener('change',renderDocs);} });
   ['custf-q','custf-st'].forEach(function(id){ var el=document.getElementById(id); if(el){el.addEventListener('input',renderCust);el.addEventListener('change',renderCust);} });
   ['delf-q','delf-st'].forEach(function(id){ var el=document.getElementById(id); if(el){el.addEventListener('input',renderDel);el.addEventListener('change',renderDel);} });
-  ['billf-q','billf-st'].forEach(function(id){ var el=document.getElementById(id); if(el){el.addEventListener('input',function(){renderBill('recv');});el.addEventListener('change',function(){renderBill('recv');});} });
+  ['billf-q','billf-st'].forEach(function(id){ var el=document.getElementById(id); if(el){el.addEventListener('input',renderBillMain);el.addEventListener('change',renderBillMain);} });
   var bmq=document.getElementById('billf-qmap'); if(bmq){ bmq.addEventListener('input',renderBillMap); }
-  var bq2=document.getElementById('billf-q2'); if(bq2){ bq2.addEventListener('input',function(){renderBill('pay');}); }
 
   // ESC closes modals
   document.addEventListener('keydown', function(e) {
@@ -1090,7 +1094,7 @@ async function deleteCustomer(id) {
 }
 
 // ── RENDER ALL ────────────────────────────────────────────
-function renderAll() { updateBadges(); renderDash(); renderShips(); renderQuots(); renderDocs(); renderCust(); renderDel(); renderBill('recv'); renderBill('pay'); renderBillMap(); renderPays(); renderRpt(); renderSettings(); }
+function renderAll() { updateBadges(); renderDash(); renderShips(); renderQuots(); renderDocs(); renderCust(); renderDel(); renderBillMain(); renderBillMap(); renderPays(); renderRpt(); renderSettings(); }
 
 // ── NAV ───────────────────────────────────────────────────
 var TITLES = {dashboard:'Dashboard',shipments:'Shipments',quotations:'Quotations',documentation:'Documentation',customs:'Customs & Clearance',delivery:'Delivery / POD',billing:'Billing',payments:'Payments',reports:'Reports',settings:'Settings',detail:'Shipment Detail'};
@@ -1355,10 +1359,15 @@ function openDet(id) {
         '</div>' +
       '</div>' +
       '<div class="det-meta">' +
-        dm('Invoice', s.invoice_number) + dm('AWB/BL', s.mawb_hawb||s.mbl_hbl, true) +
-        dm('ETD', s.etd, true) + dm('ETA', s.eta, true) +
+        dm('Invoice No.', s.invoice_number) +
+        dm('AWB / HAWB', s.mawb_hawb||s.final_awb||s.awb, true) +
+        dmD('ETD', s.etd) + dmD('ETA', s.eta) +
+        dmD('Actual Departure', s.actual_departure) +
+        dmD('Actual Arrival', s.actual_arrival) +
         dm('Shipper', s.shipper_name) + dm('Consignee', s.consignee_name) +
         dm('CHA', s.cha_name) + dm('Vendor', s.vendor_name) +
+        dm('MBL / HBL', s.mbl_hbl, true) +
+        dm('Airline / Line', s.airline_shipping_line) +
       '</div>' +
     '</div>';
 
@@ -1373,6 +1382,14 @@ function openDet(id) {
 
 function dm(lbl, val, mo) {
   return '<div><div class="dm-lbl">'+lbl+'</div><div class="dm-val'+(mo?' mo':'')+'">'+(val||'—')+'</div></div>';
+}
+function dmD(lbl, val) {
+  var display = '—';
+  if (val && val !== 'null' && val !== 'undefined') {
+    var d = normDate(val);
+    display = d ? fmtD(d) : fmtD(val);
+  }
+  return '<div><div class="dm-lbl">'+lbl+'</div><div class="dm-val mo">'+display+'</div></div>';
 }
 
 function renderSTL(s) {
@@ -1611,6 +1628,8 @@ var SF = [
   {id:'pending_with',lbl:'Pending With',t:'text'},
   {id:'next_action',lbl:'Next Action',t:'text'},
   {id:'target_date',lbl:'Target Date',t:'date'},
+  {id:'vendor_invoice_no',lbl:'Vendor Invoice No.',t:'text'},
+  {id:'vendor_payment_status',lbl:'Vendor Payment',t:'sel',opts:['Unpaid','Paid']},
   {id:'remarks',lbl:'Remarks',t:'ta',span:'full'}
 ];
 
@@ -2199,126 +2218,252 @@ function renderQuotCompare() {
 
 // ── BILLING ───────────────────────────────────────────────
 function billTab(t, el) {
-  document.getElementById('bill-recv-wrap').style.display = t==='recv' ? 'block' : 'none';
-  document.getElementById('bill-pay-wrap').style.display = t==='pay' ? 'block' : 'none';
-  document.getElementById('bill-map-wrap').style.display = t==='map' ? 'block' : 'none';
+  var mainEl = document.getElementById('bill-main-wrap');
+  var mapEl  = document.getElementById('bill-map-wrap');
+  if (mainEl) mainEl.style.display = t==='main' ? 'block' : 'none';
+  if (mapEl)  mapEl.style.display  = t==='map'  ? 'block' : 'none';
   document.querySelectorAll('#pg-billing .tab').forEach(function(x){ x.classList.remove('active'); });
   if (el) el.classList.add('active');
   if (t === 'map') renderBillMap();
-  else renderBill(t);
+  else renderBillMain();
 }
-function renderBill(t) {
-  var tid = t==='recv' ? 'bill-recv-t' : 'bill-pay-t';
-  var qid = t==='recv' ? 'billf-q' : 'billf-q2';
-  var stid = 'billf-st';
-  var q = (document.getElementById(qid)||{}).value || '';
+function renderBillMain() {
+  var q = (document.getElementById('billf-q')||{}).value || '';
   q = q.toLowerCase();
-  var st = t==='recv' ? ((document.getElementById(stid)||{}).value||'') : '';
+  var st = (document.getElementById('billf-st')||{}).value || '';
+  var el = document.getElementById('bill-main-t');
+  if (!el) return;
 
-  // Show ALL shipments (billing_amount is customer invoice in INR)
-  // Filter: no billing_amount filter — show all, unset ones just show "—"
   var data = DB.ships.filter(function(s) {
-    if (q && (s.job_number+' '+s.customer_name+' '+(s.invoice_number||'')+' '+(s.cust_invoice_no||'')).toLowerCase().indexOf(q)<0) return false;
-    if (st==='Billed' && s.billing_status!=='Billed') return false;
-    if (st==='Pending' && s.billing_status!=='Unbilled') return false;
+    if (q && (s.job_number+' '+s.customer_name+' '+(s.invoice_number||'')+' '+(s.cust_invoice_no||'')+' '+(s.vendor_name||'')).toLowerCase().indexOf(q)<0) return false;
+    var logiAmt = +(s.cust_amount_inr)||+(s.billing_amount)||0;
+    var vendorAmt = +(s.vendor_cost)||0;
+    if (st==='logi-pending'  && s.payment_status==='Received') return false;
+    if (st==='logi-pending'  && s.billing_status!=='Billed') return false;
+    if (st==='logi-received' && s.payment_status!=='Received') return false;
+    if (st==='vendor-unpaid' && !(vendorAmt>0 && s.vendor_payment_status!=='Paid')) return false;
+    if (st==='vendor-paid'   && s.vendor_payment_status!=='Paid') return false;
+    if (st==='no-logi'       && logiAmt>0) return false;
     return true;
   });
 
-  // Use cust_amount_inr as the real customer receivable; fall back to billing_amount
-  var tot = data.reduce(function(a,s){ return a+(+(s.cust_amount_inr)||+(s.billing_amount)||0); }, 0);
-  var paid = data.filter(function(s){ return s.payment_status==='Received'; }).reduce(function(a,s){ return a+(+(s.cust_amount_inr)||+(s.billing_amount)||0); }, 0);
-  var el = document.getElementById(tid);
-  if (!el) return;
+  document.getElementById('bill-main-count').textContent = data.length + ' shipments';
+
+  // Summary totals
+  var totalLogi   = data.reduce(function(a,s){ return a+(+(s.cust_amount_inr)||+(s.billing_amount)||0); },0);
+  var receivedLogi = data.filter(function(s){return s.payment_status==='Received';}).reduce(function(a,s){ return a+(+(s.cust_amount_inr)||+(s.billing_amount)||0); },0);
+  var totalVendor = data.reduce(function(a,s){ return a+(+(s.vendor_cost)||0); },0);
+  var paidVendor  = data.filter(function(s){return s.vendor_payment_status==='Paid';}).reduce(function(a,s){ return a+(+(s.vendor_cost)||0); },0);
 
   el.innerHTML =
     '<thead>' +
-      '<tr style="background:var(--s2)"><td colspan="10" style="padding:8px 12px;font-size:12px">' +
-        '<strong>Total (INR): </strong><span class="mono">₹'+fmt(tot)+'</span>' +
-        '<span style="color:var(--t3);margin-left:14px;font-size:11px">Received: ₹'+fmt(paid)+' | Outstanding: ₹'+fmt(tot-paid)+'</span>' +
-        '<button class="btn btn-xs btn-bl" style="margin-left:12px" onclick="openBillModal()">+ Add / Edit Invoice</button>' +
-      '</td></tr>' +
-      '<tr><th>Job No.</th><th>Customer</th><th>Cust. Invoice No.</th><th>Date</th>' +
-          '<th>Orig. Currency</th><th>Orig. Amount</th><th>Rate</th><th>INR Amount</th>' +
-          '<th>Status</th><th></th></tr>' +
+    '<tr style="background:var(--s2)">' +
+      '<td colspan="11" style="padding:10px 14px">' +
+        '<div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">' +
+          '<span style="font-size:12px"><span style="color:var(--t3)">Logistics Total: </span><span class="mono" style="font-weight:700;color:var(--green-b)">₹'+fmt(totalLogi)+'</span> <span style="font-size:11px;color:var(--t3)">· Received: ₹'+fmt(receivedLogi)+' · Pending: ₹'+fmt(totalLogi-receivedLogi)+'</span></span>' +
+          '<span style="font-size:12px"><span style="color:var(--t3)">Vendor Total: </span><span class="mono" style="font-weight:700;color:var(--amber-b)">₹'+fmt(totalVendor)+'</span> <span style="font-size:11px;color:var(--t3)">· Paid: ₹'+fmt(paidVendor)+' · Unpaid: ₹'+fmt(totalVendor-paidVendor)+'</span></span>' +
+        '</div>' +
+      '</td>' +
+    '</tr>' +
+    '<tr>' +
+      '<th>Job No.</th>' +
+      '<th>Customer</th>' +
+      '<th>Commercial Invoice</th>' +
+      '<th>Logistics Invoice <span style="font-weight:400;color:var(--t3)">(you → customer)</span></th>' +
+      '<th>Currency</th>' +
+      '<th>Invoice Value</th>' +
+      '<th>Received / Pending</th>' +
+      '<th>Vendor Invoice <span style="font-weight:400;color:var(--t3)">(vendor → you)</span></th>' +
+      '<th>Vendor Amount</th>' +
+      '<th>Paid / Unpaid</th>' +
+      '<th></th>' +
+    '</tr>' +
     '</thead>' +
-    '<tbody>'+
+    '<tbody>' +
     (data.length ? data.map(function(s) {
-      var cur = s.cust_currency || s.invoice_currency || 'INR';
-      var origAmt = +(s.cust_amount_orig)||+(s.invoice_value)||0;
-      var rate = +(s.cust_exchange_rate)||+(s.exchange_rate)||1;
-      var inrAmt = +(s.cust_amount_inr)||+(s.billing_amount)||0;
-      var custInv = s.cust_invoice_no || s.invoice_number || '—';
-      var hasBilling = inrAmt > 0;
-      return '<tr class="cr'+(s.billing_status==='Unbilled'&&hasBilling?' vendor-pending':'')+'" onclick="openDet(\''+s.id+'\')">'+
-        '<td class="mono" style="color:var(--green-b);font-weight:700">'+s.job_number+'</td>'+
-        '<td style="font-weight:600">'+s.customer_name+'</td>'+
-        '<td class="mono" style="font-size:11px">'+custInv+'</td>'+
-        '<td class="mono" style="font-size:11px">'+(s.shipment_date||'—')+'</td>'+
-        '<td>'+(cur!=='INR'?'<span class="cur-badge cur-'+cur.toLowerCase()+'">'+cur+'</span>':'<span class="cur-badge cur-inr">INR</span>')+'</td>'+
-        '<td class="mono" style="font-size:12px">'+(origAmt>0?fmt(origAmt):'—')+'</td>'+
-        '<td class="mono" style="font-size:11px;color:var(--t3)">'+(cur!=='INR'&&rate>0&&rate!==1?fmt(rate):'—')+'</td>'+
-        '<td class="mono" style="font-weight:700;font-size:13px">'+(inrAmt>0?'₹'+fmt(inrAmt):'<span style="color:var(--t3)">Not set</span>')+'</td>'+
-        '<td>'+bbadge(s.billing_status)+' '+pbadge(s.payment_status)+'</td>'+
-        '<td onclick="event.stopPropagation()" style="white-space:nowrap">'+
-          '<button class="btn btn-xs btn-bl" onclick="openBillModal(\''+s.id+'\')">'+
-            (hasBilling?'✏ Edit':'+ Invoice')+
-          '</button>'+
-          (hasBilling&&s.payment_status!=='Received'?' <button class="btn btn-xs btn-p" onclick="markStage(\''+s.id+'\',\'payment_received\')">Mark Paid</button>':'')+
-        '</td>'+
+      var logiInv  = s.cust_invoice_no || s.invoice_number || '';
+      var cur      = s.cust_currency || s.invoice_currency || 'INR';
+      var origAmt  = +(s.cust_amount_orig)||+(s.invoice_value)||0;
+      var logiAmt  = +(s.cust_amount_inr)||+(s.billing_amount)||0;
+      var vendorAmt = +(s.vendor_cost)||0;
+      var dutyAmt  = +(s.duty_amount)||0;
+
+      // Logistics invoice status
+      var logiStatus;
+      if (!logiAmt) {
+        logiStatus = '<span class="badge b-gy">Not raised</span>';
+      } else if (s.payment_status === 'Received') {
+        logiStatus = '<span class="badge b-gr">✓ Received</span>';
+      } else {
+        logiStatus = '<span class="badge b-rd">Pending</span>';
+      }
+
+      // Vendor invoice status
+      var vendorPaid = s.vendor_payment_status === 'Paid';
+      var vendorStatus;
+      if (!vendorAmt && !dutyAmt) {
+        vendorStatus = '<span class="badge b-gy">No invoice</span>';
+      } else if (vendorPaid) {
+        vendorStatus = '<span class="badge b-gr">✓ Paid</span>';
+      } else {
+        vendorStatus = '<span class="badge b-am">Unpaid</span>';
+      }
+
+      // Warn row: vendor has cost but logistics not raised
+      var rowWarn = (vendorAmt > 0 && !logiAmt) ? ' style="background:#fffbeb"' : '';
+
+      // Currency display
+      var curDisplay = cur !== 'INR'
+        ? '<span class="cur-badge cur-'+cur.toLowerCase()+'">'+cur+'</span>'
+        : '<span class="cur-badge cur-inr">INR</span>';
+
+      var invValueDisplay = '';
+      if (origAmt > 0 && cur !== 'INR') {
+        invValueDisplay = '<span class="mono">'+fmt(origAmt)+'</span>';
+        if (logiAmt > 0) invValueDisplay += '<br><span style="font-size:10px;color:var(--t3)">= ₹'+fmt(logiAmt)+'</span>';
+      } else if (logiAmt > 0) {
+        invValueDisplay = '<span class="mono">₹'+fmt(logiAmt)+'</span>';
+      } else {
+        invValueDisplay = '<span style="color:var(--t3)">—</span>';
+      }
+
+      var vendorAmtDisplay = (vendorAmt > 0 || dutyAmt > 0)
+        ? '<span class="mono" style="color:var(--amber-b)">₹'+fmt(vendorAmt)+'</span>' +
+          (dutyAmt > 0 ? '<br><span style="font-size:10px;color:var(--t3)">+ Duty ₹'+fmt(dutyAmt)+'</span>' : '')
+        : '<span style="color:var(--t3)">—</span>';
+
+      return '<tr class="cr"'+rowWarn+' onclick="openDet(\''+s.id+'\')">' +
+        '<td class="mono" style="color:var(--green-b);font-weight:700;font-size:12px">'+s.job_number+'</td>' +
+        '<td style="font-weight:600;font-size:12px">'+s.customer_name+'</td>' +
+        '<td class="mono" style="font-size:11px;color:var(--t2)">'+(s.invoice_number||'<span style="color:var(--t3)">—</span>')+'</td>' +
+        '<td class="mono" style="font-size:11px;font-weight:600">'+(logiInv||'<span style="font-size:11px;color:var(--t3);font-family:inherit;font-weight:400">Not raised</span>')+'</td>' +
+        '<td>'+curDisplay+'</td>' +
+        '<td>'+invValueDisplay+'</td>' +
+        '<td>'+logiStatus+'</td>' +
+        '<td style="font-size:11px;color:var(--t2)">'+(s.vendor_name||'<span style="color:var(--t3)">—</span>')+'<br><span class="mono" style="font-size:10px;color:var(--t3)">'+(s.vendor_invoice_no||'')+'</span></td>' +
+        '<td>'+vendorAmtDisplay+'</td>' +
+        '<td>'+vendorStatus+'</td>' +
+        '<td onclick="event.stopPropagation()" style="white-space:nowrap">' +
+          '<button class="btn btn-xs btn-bl" style="margin-bottom:3px" onclick="openBillModal(\''+s.id+'\')">✏ Edit</button><br>' +
+          (!vendorPaid && (vendorAmt>0||dutyAmt>0) ? '<button class="btn btn-xs" onclick="markVendorPaid(\''+s.id+'\')">Mark V.Paid</button>' : '') +
+        '</td>' +
         '</tr>';
-    }).join('') : '<tr><td colspan="10" class="t-empty">No shipments</td></tr>') +
+    }).join('') : '<tr><td colspan="11" class="t-empty">No shipments found</td></tr>') +
     '</tbody>';
+}
+async function markVendorPaid(sid) {
+  var s = DB.ships.find(function(x){ return x.id===sid; });
+  if (!s) return;
+  s.vendor_payment_status = 'Paid';
+  try { await dbU('shipments', s); toast('Vendor marked paid ✓','ok'); renderBillMain(); } catch(e){ toast('Error','err'); }
 }
 function openBillModal(shipId) {
   var s = shipId ? DB.ships.find(function(x){ return x.id===shipId; }) : null;
-  var cur = (s && s.cust_currency) || (s && s.invoice_currency) || 'USD';
-  document.getElementById('mo-bill').querySelector('.mo-title').textContent = s ? ('Invoice — '+s.job_number) : 'Add Customer Invoice';
+  var cur = (s&&s.cust_currency) || 'USD';
+
+  // Currency options
+  var currencies = ['USD','INR','GBP','EUR','AED','CNY','JPY','SGD'];
+  var curOpts = currencies.map(function(c){ return '<option'+(c===cur?' selected':'')+'>'+c+'</option>'; }).join('');
+
+  document.getElementById('mo-bill').querySelector('.mo-title').textContent =
+    s ? ('Invoice — '+s.job_number) : 'Add Invoice';
+
   document.getElementById('bill-form').innerHTML =
-    '<div class="fg" style="grid-template-columns:repeat(3,1fr)">' +
-    '<div class="fgi"><label class="fl">Job Number *</label>' +
-      '<select class="fi" id="bm_j" onchange="bmAutoFill()">' +
-        '<option value="">— Select Job —</option>' +
-        DB.ships.map(function(x){ return '<option value="'+x.id+'"'+(s&&s.id===x.id?' selected':'')+'>'+x.job_number+' · '+x.customer_name+'</option>'; }).join('') +
-      '</select>' +
-    '</div>' +
-    '<div class="fgi"><label class="fl">Customer Invoice No. *</label><input class="fi" id="bm_i" value="'+((s&&s.cust_invoice_no)||'')+'"></div>' +
-    '<div class="fgi"><label class="fl">Invoice Date</label><input class="fi" type="date" id="bm_d" value="'+((s&&s.shipment_date)||new Date().toISOString().slice(0,10))+'"></div>' +
-    '</div>' +
-    '<div style="background:var(--amber-l);border:1px solid var(--amber);border-radius:6px;padding:12px 14px;margin:12px 0">' +
-      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--amber-b);margin-bottom:10px">💱 Invoice Currency & Amount</div>' +
-      '<div class="fg" style="grid-template-columns:repeat(4,1fr)">' +
-        '<div class="fgi"><label class="fl">Currency</label>' +
-          '<select class="fi" id="bm_cur" onchange="bmCalcINR()">' +
-            ['USD','INR','GBP','EUR','AED','CNY','JPY','SGD'].map(function(c){ return '<option'+(c===cur?' selected':'')+'>'+c+'</option>'; }).join('') +
-          '</select>' +
+
+    // ── Section 0: Job + Commercial Invoice ──
+    '<datalist id="bm-j-list">' +
+      DB.ships.map(function(x){ return '<option value="'+x.job_number+'">'+x.customer_name+'</option>'; }).join('') +
+    '</datalist>' +
+    '<div style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:12px 14px;margin-bottom:14px">' +
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:10px">📦 Shipment</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">' +
+        '<div class="fgi"><label class="fl">Job Number * <span style="font-weight:400;color:var(--t3);font-size:9px">— type to search</span></label>' +
+          '<input class="fi" list="bm-j-list" id="bm_j" value="'+(s?s.job_number:'')+'" placeholder="Type job no. or customer name…" oninput="bmAutoFill()" autocomplete="off">' +
         '</div>' +
-        '<div class="fgi"><label class="fl">Amount (Orig. Currency)</label><input class="fi" type="number" id="bm_orig" value="'+((s&&s.cust_amount_orig)||'')+'" oninput="bmCalcINR()" placeholder="e.g. 1500.00"></div>' +
-        '<div class="fgi"><label class="fl">Exchange Rate (to ₹)</label><input class="fi" type="number" id="bm_rate" value="'+((s&&s.cust_exchange_rate)||'')+'" oninput="bmCalcINR()" placeholder="e.g. 84.50"></div>' +
-        '<div class="fgi"><label class="fl">INR Amount ₹</label>' +
-          '<input class="fi" type="number" id="bm_inr" value="'+((s&&s.cust_amount_inr)||(s&&s.billing_amount)||'')+'" oninput="bmManualINR()" style="font-weight:700;color:var(--green-b)">' +
+        '<div class="fgi"><label class="fl">Commercial Invoice No. <span style="font-size:9px;color:var(--t3)">(supplier → you, auto-filled)</span></label>' +
+          '<input class="fi" id="bm_comm" value="'+((s&&s.invoice_number)||'')+'" placeholder="Auto-fills on job select">' +
         '</div>' +
       '</div>' +
-      '<div style="font-size:11px;color:var(--amber-b);margin-top:8px">Enter original currency amount + exchange rate → INR auto-calculates. Or type INR directly.</div>' +
     '</div>' +
-    '<div class="fg2">' +
-    '<div class="fgi"><label class="fl">Billing Status</label><select class="fi" id="bm_bs"><option value="Billed"'+((!s||s.billing_status==='Billed')?' selected':'')+'>Billed</option><option value="Unbilled"'+(s&&s.billing_status==='Unbilled'?' selected':'')+'>Unbilled</option></select></div>' +
-    '<div class="fgi"><label class="fl">Payment Status</label><select class="fi" id="bm_ps"><option value="Pending"'+((!s||s.payment_status==='Pending')?' selected':'')+'>Pending</option><option value="Received"'+(s&&s.payment_status==='Received'?' selected':'')+'>Received</option></select></div>' +
+
+    // ── Section 1: Logistics Invoice (you → customer) ──
+    '<div style="background:#f0fdf4;border:2px solid var(--green);border-radius:6px;padding:12px 14px;margin-bottom:14px">' +
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--green-b);margin-bottom:10px">📥 Your Logistics Invoice <span style="font-weight:400;color:var(--t3)">(you → customer)</span></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 160px;gap:14px;">' +
+        '<div class="fgi"><label class="fl">Your Logistics Invoice No.</label>' +
+          '<input class="fi" id="bm_linv" value="'+((s&&s.cust_invoice_no)||'')+'" placeholder="Invoice no. you raised">' +
+        '</div>' +
+        '<div class="fgi"><label class="fl">Invoice Date</label>' +
+          '<input class="fi" type="date" id="bm_d" value="'+((s&&(s.cust_invoice_date||s.shipment_date))||new Date().toISOString().slice(0,10))+'">' +
+        '</div>' +
+        '<div class="fgi"><label class="fl">Payment Status</label>' +
+          '<select class="fi" id="bm_ps">' +
+            '<option value="Pending"'+((!s||s.payment_status==='Pending')?' selected':'')+'>Pending</option>' +
+            '<option value="Received"'+(s&&s.payment_status==='Received'?' selected':'')+'>Received</option>' +
+          '</select>' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-top:10px;padding-top:10px;border-top:1px solid #bbf7d0">' +
+        '<div style="font-size:10px;font-weight:700;color:var(--green-b);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Invoice Amount</div>' +
+        '<div class="fg" style="grid-template-columns:120px 1fr 160px 1fr;gap:8px;align-items:flex-end">' +
+          '<div class="fgi"><label class="fl">Currency</label>' +
+            '<select class="fi" id="bm_cur" onchange="bmCalcINR()">'+curOpts+'</select>' +
+          '</div>' +
+          '<div class="fgi"><label class="fl">Amount (Orig. Currency)</label>' +
+            '<input class="fi" type="number" id="bm_orig" value="'+((s&&s.cust_amount_orig)||'')+'" oninput="bmCalcINR()" placeholder="e.g. 1500">' +
+          '</div>' +
+          '<div class="fgi"><label class="fl">Exchange Rate (to ₹)</label>' +
+            '<input class="fi" type="number" id="bm_rate" value="'+((s&&s.cust_exchange_rate)||'')+'" oninput="bmCalcINR()" placeholder="e.g. 84.5">' +
+          '</div>' +
+          '<div class="fgi"><label class="fl" style="color:var(--green-b)">= INR Amount ₹</label>' +
+            '<input class="fi" type="number" id="bm_inr" value="'+((s&&s.cust_amount_inr)||(s&&s.billing_amount)||'')+'" oninput="bmManualINR()" placeholder="Auto or type" style="font-weight:700;border-color:var(--green);background:#f0fdf4">' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    // ── Section 2: Vendor Invoice (vendor → you) ──
+    '<div style="background:#faf5ff;border:2px solid var(--purple);border-radius:6px;padding:12px 14px">' +
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--purple);margin-bottom:10px">📤 Vendor Invoice <span style="font-weight:400;color:var(--t3)">(vendor → you)</span></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 140px;gap:14px;">' +
+        '<div class="fgi"><label class="fl">Vendor Invoice No.</label>' +
+          '<input class="fi" id="bm_vinv" value="'+((s&&s.vendor_invoice_no)||'')+'" placeholder="Vendor invoice no.">' +
+        '</div>' +
+        '<div class="fgi"><label class="fl">Invoice Amount (₹)</label>' +
+          '<input class="fi" type="number" id="bm_vamt" value="'+((s&&s.vendor_cost)||'')+'" placeholder="₹ amount">' +
+        '</div>' +
+        '<div class="fgi"><label class="fl">Duty Amount (₹)</label>' +
+          '<input class="fi" type="number" id="bm_duty" value="'+((s&&s.duty_amount)||'')+'" placeholder="₹ duty">' +
+        '</div>' +
+        '<div class="fgi"><label class="fl">Status</label>' +
+          '<select class="fi" id="bm_vps">' +
+            '<option value="Unpaid"'+(!s||s.vendor_payment_status!=='Paid'?' selected':'')+'>Unpaid</option>' +
+            '<option value="Paid"'+(s&&s.vendor_payment_status==='Paid'?' selected':'')+'>Paid</option>' +
+          '</select>' +
+        '</div>' +
+      '</div>' +
     '</div>';
+
   openMo('mo-bill');
 }
 function bmAutoFill() {
-  var sid = (document.getElementById('bm_j')||{}).value;
-  var s = DB.ships.find(function(x){ return x.id===sid; });
+  var jn = (document.getElementById('bm_j')||{}).value.trim();
+  var s = DB.ships.find(function(x){ return x.job_number === jn; });
   if (!s) return;
-  var invEl = document.getElementById('bm_i'); if(invEl&&!invEl.value) invEl.value = s.cust_invoice_no||s.invoice_number||'';
-  var curEl = document.getElementById('bm_cur'); if(curEl&&s.cust_currency) curEl.value = s.cust_currency;
-  else if(curEl&&s.invoice_currency) curEl.value = s.invoice_currency;
-  var origEl = document.getElementById('bm_orig'); if(origEl&&s.cust_amount_orig) origEl.value = s.cust_amount_orig;
-  else if(origEl&&s.invoice_value) origEl.value = s.invoice_value;
-  var rateEl = document.getElementById('bm_rate'); if(rateEl&&s.cust_exchange_rate) rateEl.value = s.cust_exchange_rate;
-  else if(rateEl&&s.exchange_rate) rateEl.value = s.exchange_rate;
-  var inrEl = document.getElementById('bm_inr'); if(inrEl&&s.cust_amount_inr) inrEl.value = s.cust_amount_inr;
-  else if(inrEl&&s.billing_amount) inrEl.value = s.billing_amount;
+  // Auto-fill commercial invoice immediately
+  var commEl = document.getElementById('bm_comm');
+  if (commEl) commEl.value = s.invoice_number || '';
+  var linvEl = document.getElementById('bm_linv');  if(linvEl) linvEl.value = s.cust_invoice_no||'';
+  var dEl    = document.getElementById('bm_d');     if(dEl)    dEl.value    = normDate(s.cust_invoice_date||s.shipment_date)||'';
+  var curEl  = document.getElementById('bm_cur');   if(curEl)  curEl.value  = s.cust_currency||s.invoice_currency||'USD';
+  var origEl = document.getElementById('bm_orig');  if(origEl) origEl.value = s.cust_amount_orig||s.invoice_value||'';
+  var rateEl = document.getElementById('bm_rate');  if(rateEl) rateEl.value = s.cust_exchange_rate||s.exchange_rate||'';
+  var inrEl  = document.getElementById('bm_inr');   if(inrEl)  inrEl.value  = s.cust_amount_inr||s.billing_amount||'';
+  var psEl   = document.getElementById('bm_ps');    if(psEl)   psEl.value   = s.payment_status||'Pending';
+  var vinvEl = document.getElementById('bm_vinv');  if(vinvEl) vinvEl.value = s.vendor_invoice_no||'';
+  var vamtEl = document.getElementById('bm_vamt');  if(vamtEl) vamtEl.value = s.vendor_cost||'';
+  var dutyEl = document.getElementById('bm_duty');  if(dutyEl) dutyEl.value = s.duty_amount||'';
+  var vpsEl  = document.getElementById('bm_vps');   if(vpsEl)  vpsEl.value  = s.vendor_payment_status||'Unpaid';
   bmCalcINR();
 }
 function bmCalcINR() {
@@ -2334,27 +2479,37 @@ function bmManualINR() {
   // user typed INR directly — clear rate so no conflict
 }
 async function saveBill() {
-  var sid = (document.getElementById('bm_j')||{}).value || '';
-  var s = DB.ships.find(function(x){ return x.id === sid; });
-  if (!s) { toast('Select a job number','err'); return; }
-  var custInv = (document.getElementById('bm_i')||{}).value || '';
+  var jn = ((document.getElementById('bm_j')||{}).value || '').trim();
+  var s = DB.ships.find(function(x){ return x.job_number === jn; });
+  if (!s) { toast('Select a valid job number','err'); return; }
+  var custInv  = (document.getElementById('bm_linv')||{}).value || '';
+  var commInv  = (document.getElementById('bm_comm')||{}).value || '';
+  var invDate  = (document.getElementById('bm_d')||{}).value || '';
   var cur = (document.getElementById('bm_cur')||{}).value || 'INR';
   var origAmt = (document.getElementById('bm_orig')||{}).value;
   var rate = (document.getElementById('bm_rate')||{}).value;
   var inrAmt = (document.getElementById('bm_inr')||{}).value;
-  var bStatus = (document.getElementById('bm_bs')||{}).value || 'Billed';
   var pStatus = (document.getElementById('bm_ps')||{}).value || 'Pending';
-  if (!inrAmt || +inrAmt <= 0) { toast('Enter INR amount','err'); return; }
   // Store customer invoice fields separately from shipment cost fields
-  s.cust_invoice_no = custInv || s.invoice_number;
-  s.cust_currency = cur;
-  s.cust_amount_orig = origAmt ? +origAmt : null;
-  s.cust_exchange_rate = rate ? +rate : null;
-  s.cust_amount_inr = +inrAmt;
-  s.billing_amount = +inrAmt;  // keep billing_amount in sync as INR total
-  s.billing_status = bStatus;
-  s.payment_status = pStatus;
-  if (custInv) s.invoice_number = custInv;
+  s.cust_invoice_no     = custInv || '';
+  s.cust_invoice_date   = invDate || null;
+  if (commInv) s.invoice_number = commInv;
+  s.cust_currency       = cur;
+  s.cust_amount_orig    = origAmt ? +origAmt : null;
+  s.cust_exchange_rate  = rate ? +rate : null;
+  s.cust_amount_inr     = inrAmt ? +inrAmt : null;
+  s.billing_amount      = inrAmt ? +inrAmt : s.billing_amount;
+  s.billing_status      = (inrAmt && +inrAmt > 0) ? 'Billed' : (s.billing_status||'Unbilled');
+  s.payment_status      = pStatus;
+  // Vendor invoice fields
+  var vInv  = (document.getElementById('bm_vinv')||{}).value || '';
+  var vAmt  = (document.getElementById('bm_vamt')||{}).value || '';
+  var vPay  = (document.getElementById('bm_vps')||{}).value  || 'Unpaid';
+  var vDuty = (document.getElementById('bm_duty')||{}).value || '';
+  if (vInv)  s.vendor_invoice_no = vInv;
+  if (vAmt)  s.vendor_cost = +vAmt;
+  if (vDuty) s.duty_amount = +vDuty;
+  s.vendor_payment_status = vPay;
   try {
     await dbU('shipments', s);
     toast('Invoice saved ✓','ok');
@@ -2479,7 +2634,7 @@ function renderRpt() {
 }
 
 // ── SETTINGS ──────────────────────────────────────────────
-var SQL_SCHEMA = 'create table if not exists shipments (\n  id text primary key,\n  job_number text unique not null,\n  shipment_date date, customer_name text, shipper_name text,\n  consignee_name text, shipment_type text, mode text,\n  pol text, pod text, final_destination text, commodity text,\n  packages int, gross_weight numeric, chargeable_weight numeric, volume numeric,\n  invoice_number text, invoice_currency text default \'INR\', invoice_value numeric, exchange_rate numeric, invoice_value_inr numeric, mawb_hawb text, mbl_hbl text, airline_shipping_line text,\n  etd date, eta date, actual_departure date, actual_arrival date,\n  cha_name text, vendor_name text,\n  duty_amount numeric default 0, billing_amount numeric default 0, vendor_cost numeric default 0, cust_invoice_no text, cust_currency text, cust_amount_orig numeric, cust_exchange_rate numeric, cust_amount_inr numeric,\n  current_stage text default \'inquiry_received\', stages jsonb default \'{}\',\n  billing_status text default \'Unbilled\', payment_status text default \'Pending\',\n  pod_status text default \'POD Pending\', pending_with text, next_action text,\n  target_date date, remarks text,\n  doc_checklist boolean default false, doc_ci boolean default false,\n  doc_pl boolean default false, doc_kyc boolean default false,\n  doc_gst_iec boolean default false, doc_shipping_bill boolean default false,\n  doc_remarks text, created_at timestamptz default now()\n);\ncreate table if not exists quotations (\n  id text primary key, quote_number text, date date,\n  customer_name text, origin text, destination text, mode text,\n  buy_cost numeric default 0, sell_amount numeric default 0,\n  status text default \'Draft\', notes text, charges jsonb default \'[]\',\n  created_at timestamptz default now()\n);\ncreate table if not exists payments (\n  id text primary key, job_number text, party text,\n  invoice_number text, type text, amount numeric default 0,\n  date date, due_date date, status text default \'Pending\',\n  paid_date date, created_at timestamptz default now()\n);\ncreate table if not exists activity (\n  id text primary key, text text, type text,\n  shipment_id text, created_at timestamptz default now()\n);\n\n-- Enable RLS with open access (customize for your auth):\nalter table shipments enable row level security;\nalter table quotations enable row level security;\nalter table payments enable row level security;\nalter table activity enable row level security;\ncreate policy "open" on shipments for all using (true) with check (true);\ncreate policy "open" on quotations for all using (true) with check (true);\ncreate policy "open" on payments for all using (true) with check (true);\ncreate policy "open" on activity for all using (true) with check (true);';
+var SQL_SCHEMA = 'create table if not exists shipments (\n  id text primary key,\n  job_number text unique not null,\n  shipment_date date, customer_name text, shipper_name text,\n  consignee_name text, shipment_type text, mode text,\n  pol text, pod text, final_destination text, commodity text,\n  packages int, gross_weight numeric, chargeable_weight numeric, volume numeric,\n  invoice_number text, invoice_currency text default \'INR\', invoice_value numeric, exchange_rate numeric, invoice_value_inr numeric, mawb_hawb text, mbl_hbl text, airline_shipping_line text,\n  etd date, eta date, actual_departure date, actual_arrival date,\n  cha_name text, vendor_name text,\n  duty_amount numeric default 0, billing_amount numeric default 0, vendor_cost numeric default 0, cust_invoice_no text, cust_invoice_date date, cust_currency text, cust_amount_orig numeric, cust_exchange_rate numeric, cust_amount_inr numeric, vendor_invoice_no text, vendor_payment_status text default \'Unpaid\',\n  current_stage text default \'inquiry_received\', stages jsonb default \'{}\',\n  billing_status text default \'Unbilled\', payment_status text default \'Pending\',\n  pod_status text default \'POD Pending\', pending_with text, next_action text,\n  target_date date, remarks text,\n  doc_checklist boolean default false, doc_ci boolean default false,\n  doc_pl boolean default false, doc_kyc boolean default false,\n  doc_gst_iec boolean default false, doc_shipping_bill boolean default false,\n  doc_remarks text, created_at timestamptz default now()\n);\ncreate table if not exists quotations (\n  id text primary key, quote_number text, date date,\n  customer_name text, origin text, destination text, mode text,\n  buy_cost numeric default 0, sell_amount numeric default 0,\n  status text default \'Draft\', notes text, charges jsonb default \'[]\',\n  created_at timestamptz default now()\n);\ncreate table if not exists payments (\n  id text primary key, job_number text, party text,\n  invoice_number text, type text, amount numeric default 0,\n  date date, due_date date, status text default \'Pending\',\n  paid_date date, created_at timestamptz default now()\n);\ncreate table if not exists activity (\n  id text primary key, text text, type text,\n  shipment_id text, created_at timestamptz default now()\n);\n\n-- Enable RLS with open access (customize for your auth):\nalter table shipments enable row level security;\nalter table quotations enable row level security;\nalter table payments enable row level security;\nalter table activity enable row level security;\ncreate policy "open" on shipments for all using (true) with check (true);\ncreate policy "open" on quotations for all using (true) with check (true);\ncreate policy "open" on payments for all using (true) with check (true);\ncreate policy "open" on activity for all using (true) with check (true);';
 
 function renderSettings() {
   document.getElementById('set-body').innerHTML =
