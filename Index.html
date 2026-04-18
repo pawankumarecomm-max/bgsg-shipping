@@ -302,6 +302,65 @@ textarea.fi{resize:vertical;min-height:65px}
 
 @media(max-width:1000px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.dg{grid-template-columns:1fr}.det-grid{grid-template-columns:1fr}.det-meta{grid-template-columns:repeat(2,1fr)}.dg3{grid-template-columns:1fr 1fr}}
 @media(max-width:640px){.kpi-grid{grid-template-columns:1fr}.fg{grid-template-columns:1fr}.sidebar{display:none}.content{padding:12px}}
+
+/* In-Transit row highlight */
+tr.row-intransit td { background: #fef3c7 !important; }
+tr.row-intransit:hover td { background: #fde68a !important; }
+tr.row-intransit td:first-child { border-left: 3px solid var(--amber); }
+
+/* Currency badge */
+.cur-badge { display:inline-flex; align-items:center; gap:3px; padding:1px 5px; border-radius:3px; font-size:10px; font-weight:700; background:var(--s2); border:1px solid var(--b1); color:var(--t2); font-family:'JetBrains Mono',monospace; }
+.cur-inr { background:#f0fdf4; border-color:#86efac; color:#166534; }
+.cur-usd { background:#eff6ff; border-color:#93c5fd; color:#1e40af; }
+.cur-gbp { background:#fdf4ff; border-color:#d8b4fe; color:#6b21a8; }
+.cur-eur { background:#fff7ed; border-color:#fdba74; color:#9a3412; }
+
+/* Billing margin row */
+.margin-positive { color: var(--green-b); font-weight:700; }
+.margin-negative { color: var(--red-b); font-weight:700; }
+.vendor-pending { background:#fff7ed; }
+.vendor-pending td { background:#fff7ed !important; }
+
+/* Quotation compare */
+.quot-compare-wrap { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; padding:4px 0 12px; }
+.quot-compare-card { background:var(--s1); border:1px solid var(--b1); border-radius:8px; padding:14px; position:relative; transition:all .15s; }
+.quot-compare-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.08); transform:translateY(-1px); }
+.quot-compare-card.best { border-color:var(--green); border-width:2px; }
+.quot-compare-card .best-tag { position:absolute; top:-9px; right:12px; background:var(--green); color:#fff; font-size:10px; font-weight:700; padding:2px 8px; border-radius:9px; }
+.qcc-header { font-size:11px; font-weight:700; color:var(--t3); text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px; }
+.qcc-row { display:flex; justify-content:space-between; padding:3px 0; font-size:12px; }
+.qcc-label { color:var(--t2); }
+.qcc-val { font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--t1); }
+.qcc-total { border-top:1px solid var(--b1); margin-top:8px; padding-top:8px; font-size:13px; font-weight:700; display:flex; justify-content:space-between; }
+
+/* Billing P&L map */
+/* P&L Map redesign */
+.pl-kpi-strip { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; padding:14px 16px; background:var(--s2); border-bottom:1px solid var(--b1); }
+.pl-kpi { text-align:center; }
+.pl-kpi-lbl { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--t3); margin-bottom:4px; }
+.pl-kpi-val { font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700; }
+.pl-kpi-val.gr { color:var(--green-b); }
+.pl-kpi-val.am { color:var(--amber-b); }
+.pl-kpi-val.rd { color:var(--red-b); }
+.pl-kpi-val.bl { color:var(--blue-b); }
+.pl-kpi-val.te { color:var(--teal); }
+.pl-kpi-sub { font-size:10px; color:var(--t3); margin-top:2px; }
+.pl-bar-wrap { height:6px; background:var(--b1); border-radius:3px; margin-top:6px; overflow:hidden; }
+.pl-bar { height:100%; border-radius:3px; transition:width .4s; }
+.pl-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+.pl-tbl thead th { text-align:left; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--t3); padding:9px 14px; background:var(--s2); border-bottom:2px solid var(--b1); white-space:nowrap; }
+.pl-tbl tbody td { padding:10px 14px; border-bottom:1px solid var(--b1); vertical-align:middle; }
+.pl-tbl tbody tr:last-child td { border-bottom:none; }
+.pl-tbl tbody tr:hover td { background:var(--s3); }
+.pl-tbl tbody tr.pl-warn td { background:#fffbeb; }
+.pl-tbl tbody tr.pl-loss td { background:#fff1f2; }
+.pl-margin-bar { height:8px; border-radius:4px; min-width:4px; display:inline-block; vertical-align:middle; }
+.pl-flag { display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; white-space:nowrap; }
+.pl-flag.ok { background:#dcfce7; color:#166534; }
+.pl-flag.warn { background:#fef3c7; color:#92400e; }
+.pl-flag.bad { background:#fee2e2; color:#991b1b; }
+.pl-flag.gray { background:var(--s2); color:var(--t3); border:1px solid var(--b1); }
+
 </style>
 </head>
 <body>
@@ -460,15 +519,19 @@ textarea.fi{resize:vertical;min-height:65px}
     <div class="page" id="pg-quotations">
       <div class="sh">
         <div><div class="sh-title">Quotations</div><div class="sh-sub">Customer quotations and pricing</div></div>
-        <button class="btn btn-p" onclick="openNewQuot()">+ New Quotation</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-bl" onclick="toggleQuotCompare()">⚖ Compare</button>
+          <button class="btn btn-p" onclick="openNewQuot()">+ New Quotation</button>
+        </div>
       </div>
+      <div id="quot-compare-panel" style="display:none"></div>
       <div class="fb">
         <input id="qf-q" placeholder="🔍 Search quotations…">
         <select id="qf-st"><option value="">All Status</option><option>Draft</option><option>Sent</option><option>Approved</option><option>Rejected</option></select>
         <span class="fc" id="quot-count"></span>
       </div>
       <div class="card"><div class="tw">
-        <table><thead><tr><th>Quote No.</th><th>Date</th><th>Customer</th><th>Route</th><th>Mode</th><th>Buy Cost</th><th>Sell</th><th>Margin</th><th>Status</th><th></th></tr></thead>
+        <table><thead><tr><th>Quote No.</th><th>Date</th><th>Customer</th><th>Job No.</th><th>Route</th><th>Mode</th><th>Basic Cost</th><th>GST</th><th>Total Sell</th><th>Per Unit</th><th>Margin</th><th>Status</th><th></th></tr></thead>
         <tbody id="quot-tb"></tbody></table>
       </div></div>
     </div>
@@ -521,6 +584,7 @@ textarea.fi{resize:vertical;min-height:65px}
       <div class="tabs">
         <div class="tab active" id="bill-tab-recv" onclick="billTab('recv',this)">Receivable (Customer)</div>
         <div class="tab" id="bill-tab-pay" onclick="billTab('pay',this)">Payable (Vendor)</div>
+        <div class="tab" id="bill-tab-map" onclick="billTab('map',this)">📊 P&L Map</div>
       </div>
       <div id="bill-recv-wrap">
         <div class="fb">
@@ -532,6 +596,10 @@ textarea.fi{resize:vertical;min-height:65px}
       <div id="bill-pay-wrap" style="display:none">
         <div class="fb"><input id="billf-q2" placeholder="🔍 Search…"></div>
         <div class="card"><div class="tw"><table id="bill-pay-t"></table></div></div>
+      </div>
+      <div id="bill-map-wrap" style="display:none">
+        <div class="fb"><input id="billf-qmap" placeholder="🔍 Search job / customer…"><span class="fc" id="bill-map-count"></span></div>
+        <div class="card" id="bill-map-card"></div>
       </div>
     </div>
 
@@ -584,7 +652,7 @@ textarea.fi{resize:vertical;min-height:65px}
 </div>
 <div class="mo" id="mo-bill">
   <div class="mo-box sm">
-    <div class="mo-head"><div class="mo-title">Add Invoice</div><button class="mo-x" onclick="closeMo('mo-bill')">×</button></div>
+    <div class="mo-head"><div class="mo-title">Add Customer Invoice</div><button class="mo-x" onclick="closeMo('mo-bill')">×</button></div>
     <div class="mo-body" id="bill-form"></div>
     <div class="mo-foot"><button class="btn" onclick="closeMo('mo-bill')">Cancel</button><button class="btn btn-p" onclick="saveBill()">Save</button></div>
   </div>
@@ -838,6 +906,7 @@ window.addEventListener('load', function() {
   ['custf-q','custf-st'].forEach(function(id){ var el=document.getElementById(id); if(el){el.addEventListener('input',renderCust);el.addEventListener('change',renderCust);} });
   ['delf-q','delf-st'].forEach(function(id){ var el=document.getElementById(id); if(el){el.addEventListener('input',renderDel);el.addEventListener('change',renderDel);} });
   ['billf-q','billf-st'].forEach(function(id){ var el=document.getElementById(id); if(el){el.addEventListener('input',function(){renderBill('recv');});el.addEventListener('change',function(){renderBill('recv');});} });
+  var bmq=document.getElementById('billf-qmap'); if(bmq){ bmq.addEventListener('input',renderBillMap); }
   var bq2=document.getElementById('billf-q2'); if(bq2){ bq2.addEventListener('input',function(){renderBill('pay');}); }
 
   // ESC closes modals
@@ -1021,7 +1090,7 @@ async function deleteCustomer(id) {
 }
 
 // ── RENDER ALL ────────────────────────────────────────────
-function renderAll() { updateBadges(); renderDash(); renderShips(); renderQuots(); renderDocs(); renderCust(); renderDel(); renderBill('recv'); renderBill('pay'); renderPays(); renderRpt(); renderSettings(); }
+function renderAll() { updateBadges(); renderDash(); renderShips(); renderQuots(); renderDocs(); renderCust(); renderDel(); renderBill('recv'); renderBill('pay'); renderBillMap(); renderPays(); renderRpt(); renderSettings(); }
 
 // ── NAV ───────────────────────────────────────────────────
 var TITLES = {dashboard:'Dashboard',shipments:'Shipments',quotations:'Quotations',documentation:'Documentation',customs:'Customs & Clearance',delivery:'Delivery / POD',billing:'Billing',payments:'Payments',reports:'Reports',settings:'Settings',detail:'Shipment Detail'};
@@ -1159,14 +1228,16 @@ function renderShips() {
   if (sPage > pages) sPage = pages;
   var slice = data.slice((sPage-1)*PER, sPage*PER);
 
-  var H = ['job_number','customer_name','shipment_date','invoice_number','shipper_name','pol','pod','mode','commodity','eta','current_stage','billing_status'];
-  var HL = ['Job Number','Customer Name','Date of Invoice','Invoice Number','Sender','Origin Country','Destination Country','Transport Mode','SKU Details','ETA','Status','Billing Status'];
+  var H = ['job_number','customer_name','shipment_date','invoice_number','shipper_name','pol','pod','mode','commodity','eta','current_stage','invoice_currency','billing_status'];
+  var HL = ['Job Number','Customer Name','Invoice Date','Invoice No.','Sender','Origin','Destination','Mode','SKU','ETA','Status','Currency','Billing'];
   document.getElementById('ship-th').innerHTML = '<tr>' + H.map(function(h,i){
     return '<th onclick="setSort(\''+h+'\')">' + HL[i] + (sSort===h?(sDir==='asc'?' ▲':' ▼'):'') + '</th>';
   }).join('') + '</tr>';
 
   document.getElementById('ship-tb').innerHTML = slice.length ? slice.map(function(s) {
-    return '<tr class="cr" onclick="openDet(\''+s.id+'\')">'+
+    var isTransit = (s.current_stage === 'intransit');
+    var rowCls = 'cr' + (isTransit ? ' row-intransit' : '');
+    return '<tr class="'+rowCls+'" onclick="openDet(\''+s.id+'\')">'+
       '<td><span class="mono" style="color:var(--green-b);font-weight:700">'+(s.job_number||'—')+'</span></td>'+
       '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;font-weight:600" title="'+esc(s.customer_name||'')+'">'+(s.customer_name||'—')+'</td>'+
       '<td class="mono" style="font-size:11px">'+(s.shipment_date||'—')+'</td>'+
@@ -1178,6 +1249,7 @@ function renderShips() {
       '<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis" title="'+esc(s.commodity||'')+'">'+(s.commodity||'—')+'</td>'+
       '<td class="mono" style="font-size:11px;'+(s.eta&&s.eta<today?'color:var(--red-b)':'')+'">'+(s.eta||'—')+'</td>'+
       '<td style="font-size:11px;color:var(--t3)">'+slbl(s.current_stage)+'</td>'+
+      '<td>'+(s.invoice_currency?'<span class="cur-badge cur-'+String(s.invoice_currency).toLowerCase()+'">'+s.invoice_currency+'</span>':'—')+(s.invoice_value?' <span class="mono" style="font-size:11px">'+fmt(s.invoice_value)+'</span>':'')+'</td>'+
       '<td>'+bbadge(s.billing_status)+'</td>'+
       '</tr>';
   }).join('') : '<tr><td colspan="12" class="t-empty">No shipments found</td></tr>';
@@ -1558,6 +1630,21 @@ function openEditShip() {
   buildShipForm(s);
   openMo('mo-ship');
 }
+function sfAutoCalcINR() {
+  var cur = (document.getElementById('f_invoice_currency')||{}).value||'INR';
+  var orig = +(document.getElementById('f_invoice_value')||{}).value||0;
+  var rate = +(document.getElementById('f_exchange_rate')||{}).value||0;
+  var inrEl = document.getElementById('f_invoice_value_inr');
+  if (!inrEl) return;
+  if (cur === 'INR') { inrEl.value = orig > 0 ? orig : ''; inrEl.style.color=''; return; }
+  if (orig > 0 && rate > 0) {
+    inrEl.value = Math.round(orig * rate);
+    inrEl.style.color = 'var(--green-b)';
+  } else {
+    inrEl.value = '';
+    inrEl.style.color = '';
+  }
+}
 function buildShipForm(s) {
   if (!s) s = {};
   document.getElementById('ship-form').innerHTML = SF.map(function(f) {
@@ -1576,7 +1663,27 @@ function buildShipForm(s) {
       var val = (f.t === 'date') ? (normDate(s[f.id]) || '') : esc(s[f.id] != null ? s[f.id] : '');
       inp = '<input class="fi" type="'+f.t+'" id="f_'+f.id+'" value="'+val+'" placeholder="'+esc(f.ph||'')+'">';
     }
-    return '<div class="fgi'+(f.span?' '+f.span:'')+'"><label class="fl">'+f.lbl+'</label>'+inp+'</div>';
+    var baseField = '<div class="fgi'+(f.span?' '+f.span:'')+'"><label class="fl">'+f.lbl+'</label>'+inp+'</div>';
+    // After invoice_number, inject the currency block spanning full width
+    if (f.id === 'invoice_number') {
+      var cur = s.invoice_currency || 'USD';
+      var curOpts = ['USD','INR','GBP','EUR','AED','CNY','JPY','SGD'];
+      baseField += '<div class="fgi full" style="grid-column:1/-1">' +
+        '<label class="fl">Invoice Value <span style="color:var(--blue-b);font-weight:700">— Original Currency</span></label>' +
+        '<div style="display:grid;grid-template-columns:120px 1fr 160px 1fr;gap:8px;align-items:center">' +
+          '<select class="fi" id="f_invoice_currency" onchange="sfAutoCalcINR()" style="font-weight:700">' +
+            curOpts.map(function(c){ return '<option'+(c===cur?' selected':'')+'>'+c+'</option>'; }).join('') +
+          '</select>' +
+          '<input class="fi" type="number" id="f_invoice_value" value="'+esc(s.invoice_value!=null?s.invoice_value:'')+'" placeholder="Amount in '+cur+'" oninput="sfAutoCalcINR()" style="font-family:var(--mono,monospace)">' +
+          '<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t3);white-space:nowrap">× Rate to ₹ <input class="fi" type="number" id="f_exchange_rate" value="'+esc(s.exchange_rate!=null?s.exchange_rate:'')+'" placeholder="e.g. 84.5" oninput="sfAutoCalcINR()" style="width:90px;font-family:var(--mono,monospace)"></div>' +
+          '<div style="position:relative"><input class="fi" type="number" id="f_invoice_value_inr" value="'+(s.invoice_value&&s.exchange_rate&&s.invoice_currency&&s.invoice_currency!=='INR'?Math.round(s.invoice_value*s.exchange_rate):s.invoice_currency==='INR'&&s.invoice_value?s.invoice_value:'')+'" placeholder="= ₹ INR" style="padding-left:28px;font-weight:700;color:var(--green-b);font-family:var(--mono,monospace)" readonly>' +
+            '<span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:700;color:var(--green-b);pointer-events:none">₹</span>' +
+          '</div>' +
+        '</div>' +
+        '<div style="font-size:10px;color:var(--t3);margin-top:4px">Select currency → enter amount → enter exchange rate → INR auto-fills</div>' +
+      '</div>';
+    }
+    return baseField;
   }).join('');
 }
 function getShipForm() {
@@ -1589,6 +1696,16 @@ function getShipForm() {
     else if (f.t === 'number') d[f.id] = v === '' ? null : Number(v);
     else d[f.id] = f.id === 'customer_name' ? normalizeCustomerName(v) : v;
   });
+  // Collect currency fields (not in SF, rendered inline)
+  var curEl = document.getElementById('f_invoice_currency');
+  var valEl = document.getElementById('f_invoice_value');
+  var rateEl = document.getElementById('f_exchange_rate');
+  var inrEl = document.getElementById('f_invoice_value_inr');
+  if (curEl) d.invoice_currency = curEl.value || 'INR';
+  if (valEl) d.invoice_value = valEl.value === '' ? null : Number(valEl.value);
+  if (rateEl) d.exchange_rate = rateEl.value === '' ? null : Number(rateEl.value);
+  // Store INR equivalent for quick display
+  if (inrEl && inrEl.value) d.invoice_value_inr = Number(inrEl.value);
   return d;
 }
 async function saveShip() {
@@ -1681,44 +1798,89 @@ function editQuotFn(id) {
 }
 function buildQuotForm(q) {
   if (!q) q = {};
+  var jobOptions = DB.ships.map(function(s){ return '<option value="'+s.job_number+'">'+s.job_number+' — '+s.customer_name+'</option>'; }).join('');
   document.getElementById('quot-form').innerHTML =
     '<div class="fg">' +
     '<div class="fgi"><label class="fl">Quote Number</label><input class="fi" id="q_qn" value="'+(q.quote_number||'')+'"></div>' +
-    '<div class="fgi"><label class="fl">Date</label><input class="fi" type="date" id="q_dt" value="'+(q.date||'')+'"></div>' +
+    '<div class="fgi"><label class="fl">Date</label><input class="fi" type="date" id="q_dt" value="'+(normDate(q.date)||'')+'"></div>' +
     '<div class="fgi"><label class="fl">Customer *</label><div style="display:flex;gap:6px;align-items:center"><input class="fi" list="customer-list-quot" id="q_cn" value="'+esc(q.customer_name||'')+'" placeholder="Search or type customer"><button type="button" class="btn btn-sm" onclick="saveCustomerFromInput(\'q_cn\')">+ Save</button></div>'+customerDatalistHTML('customer-list-quot')+'</div>' +
+    '<div class="fgi"><label class="fl">Link to Job No.</label><select class="fi" id="q_jn"><option value="">— Not linked —</option>'+jobOptions+'</select></div>' +
     '<div class="fgi"><label class="fl">Origin</label><input class="fi" id="q_or" value="'+(q.origin||'')+'"></div>' +
     '<div class="fgi"><label class="fl">Destination</label><input class="fi" id="q_ds" value="'+(q.destination||'')+'"></div>' +
     '<div class="fgi"><label class="fl">Mode</label><select class="fi" id="q_md">'+['Air','Sea LCL','Sea FCL','Road'].map(function(o){ return '<option'+(q.mode===o?' selected':'')+'>'+o+'</option>'; }).join('')+'</select></div>' +
-    '<div class="fgi"><label class="fl">Buy Cost (₹)</label><input class="fi" type="number" id="q_bc" value="'+(q.buy_cost||'')+'" oninput="qMargin()"></div>' +
-    '<div class="fgi"><label class="fl">Sell Amount (₹)</label><input class="fi" type="number" id="q_sa" value="'+(q.sell_amount||'')+'" oninput="qMargin()"></div>' +
+    '<div class="fgi"><label class="fl">Units / Packages</label><input class="fi" type="number" id="q_units" value="'+(q.units||'')+'" oninput="qMargin()" placeholder="e.g. 100"></div>' +
     '<div class="fgi"><label class="fl">Status</label><select class="fi" id="q_st">'+['Draft','Sent','Approved','Rejected'].map(function(o){ return '<option'+(q.status===o?' selected':'')+'>'+o+'</option>'; }).join('')+'</select></div>' +
     '</div>' +
-    '<div style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:10px 14px;margin-top:12px;display:flex;justify-content:space-between;align-items:center">' +
-      '<span style="font-size:12px;color:var(--t3)">Margin</span>' +
-      '<span class="mono" style="font-size:14px;font-weight:700" id="q-margin">₹0</span>' +
+    '<div style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:12px 14px;margin-top:12px">' +
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:10px">💰 Cost Breakdown</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">' +
+        '<div class="fgi"><label class="fl">Buy Cost (₹)</label><input class="fi" type="number" id="q_bc" value="'+(q.buy_cost||'')+'" oninput="qMargin()"></div>' +
+        '<div class="fgi"><label class="fl">Basic Sell (₹)</label><input class="fi" type="number" id="q_sa" value="'+(q.sell_amount||'')+'" oninput="qMargin()"></div>' +
+        '<div class="fgi"><label class="fl">GST Amount (₹)</label><input class="fi" type="number" id="q_gst" value="'+(q.gst_amount||'')+'" oninput="qMargin()"></div>' +
+        '<div class="fgi"><label class="fl">GST % (auto)</label><input class="fi" type="number" id="q_gstp" value="'+(q.gst_pct||18)+'" oninput="qGstFromPct()" placeholder="18"></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--b1)">' +
+        '<div><div style="font-size:10px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Total Sell</div><div class="mono" style="font-size:15px;font-weight:700;color:var(--t1)" id="q-total">₹0</div></div>' +
+        '<div><div style="font-size:10px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Per Unit</div><div class="mono" style="font-size:15px;font-weight:700;color:var(--purple)" id="q-perunit">—</div></div>' +
+        '<div><div style="font-size:10px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Margin</div><div class="mono" style="font-size:15px;font-weight:700" id="q-margin">₹0</div></div>' +
+        '<div><div style="font-size:10px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Margin %</div><div class="mono" style="font-size:15px;font-weight:700" id="q-marginpct">0%</div></div>' +
+      '</div>' +
     '</div>' +
     '<div class="fgi" style="margin-top:12px"><label class="fl">Notes</label><textarea class="fi" id="q_nt" rows="2">'+(q.notes||'')+'</textarea></div>';
+  // Set job number dropdown value after render
+  setTimeout(function(){
+    var jnEl = document.getElementById('q_jn');
+    if (jnEl && q.job_number) jnEl.value = q.job_number;
+  }, 0);
 }
 function qMargin() {
   var b = +(document.getElementById('q_bc')||{}).value||0;
   var sa = +(document.getElementById('q_sa')||{}).value||0;
-  var m = sa - b;
-  var el = document.getElementById('q-margin');
-  if (el) { el.textContent = '₹'+fmt(Math.abs(m))+' '+(m>=0?'▲':'▼'); el.style.color = m>=0?'var(--green-b)':'var(--red-b)'; }
+  var gst = +(document.getElementById('q_gst')||{}).value||0;
+  var units = +(document.getElementById('q_units')||{}).value||0;
+  var total = sa + gst;
+  var m = total - b;
+  var mpct = b > 0 ? Math.round(m/b*100) : 0;
+  var perUnit = units > 0 ? total/units : 0;
+  var mel = document.getElementById('q-margin');
+  if (mel) { mel.textContent = '₹'+fmt(Math.abs(m))+' '+(m>=0?'▲':'▼'); mel.style.color = m>=0?'var(--green-b)':'var(--red-b)'; }
+  var tel = document.getElementById('q-total');
+  if (tel) tel.textContent = '₹'+fmt(total);
+  var pel = document.getElementById('q-perunit');
+  if (pel) { pel.textContent = perUnit > 0 ? '₹'+fmt(perUnit) : '—'; }
+  var mpe = document.getElementById('q-marginpct');
+  if (mpe) { mpe.textContent = mpct+'%'; mpe.style.color = mpct>=0?'var(--green-b)':'var(--red-b)'; }
+  // auto-update GST pct field
+  var gpEl = document.getElementById('q_gstp');
+  if (gpEl && sa > 0 && gst > 0) gpEl.value = Math.round(gst/sa*100);
+}
+function qGstFromPct() {
+  var sa = +(document.getElementById('q_sa')||{}).value||0;
+  var pct = +(document.getElementById('q_gstp')||{}).value||0;
+  var gstEl = document.getElementById('q_gst');
+  if (gstEl) gstEl.value = Math.round(sa * pct / 100);
+  qMargin();
 }
 async function saveQuot() {
   var qDate = (document.getElementById('q_dt')||{}).value || '';
   var qBuy = (document.getElementById('q_bc')||{}).value || '';
   var qSell = (document.getElementById('q_sa')||{}).value || '';
+  var qGst = (document.getElementById('q_gst')||{}).value || '';
+  var qUnits = (document.getElementById('q_units')||{}).value || '';
+  var qJn = (document.getElementById('q_jn')||{}).value || '';
   var d = {
     quote_number: (document.getElementById('q_qn')||{}).value,
     date: qDate ? qDate : null,
     customer_name: normalizeCustomerName((document.getElementById('q_cn')||{}).value),
+    job_number: qJn || null,
     origin: (document.getElementById('q_or')||{}).value,
     destination: (document.getElementById('q_ds')||{}).value,
     mode: (document.getElementById('q_md')||{}).value,
     buy_cost: qBuy === '' ? 0 : Number(qBuy),
     sell_amount: qSell === '' ? 0 : Number(qSell),
+    gst_amount: qGst === '' ? 0 : Number(qGst),
+    units: qUnits === '' ? 0 : Number(qUnits),
+    gst_pct: +(document.getElementById('q_gstp')||{}).value||18,
     status: (document.getElementById('q_st')||{}).value,
     notes: (document.getElementById('q_nt')||{}).value
   };
@@ -1825,13 +1987,225 @@ function renderDel() {
   }).join('') || '<tr><td colspan="10" class="t-empty">No data</td></tr>';
 }
 
+
+// ── BILLING P&L MAP ───────────────────────────────────────
+function renderBillMap() {
+  var q = (document.getElementById('billf-qmap')||{}).value || '';
+  q = q.toLowerCase();
+
+  var allShips = DB.ships;
+  var ships = q ? allShips.filter(function(s){
+    return (s.job_number+' '+s.customer_name+' '+(s.vendor_name||'')).toLowerCase().indexOf(q) >= 0;
+  }) : allShips;
+
+  var el = document.getElementById('bill-map-card');
+  if (!el) return;
+
+  // ── KPI totals ──
+  var totalRecv   = ships.reduce(function(a,s){ return a+(+(s.cust_amount_inr)||+(s.billing_amount)||0); }, 0);
+  var totalVendor = ships.reduce(function(a,s){ return a+(+(s.vendor_cost)||0); }, 0);
+  var totalDuty   = ships.reduce(function(a,s){ return a+(+(s.duty_amount)||0); }, 0);
+  var totalCost   = totalVendor + totalDuty;
+  var totalMargin = totalRecv - totalCost;
+  var marginPct   = totalRecv > 0 ? Math.round(totalMargin / totalRecv * 100) : 0;
+  var billed      = ships.filter(function(s){ return s.billing_status === 'Billed'; }).length;
+  var paid        = ships.filter(function(s){ return s.payment_status === 'Received'; }).length;
+  var noBill      = ships.filter(function(s){ return s.billing_status !== 'Billed' && (+(s.vendor_cost)||0) > 0; }).length;
+
+  document.getElementById('bill-map-count').textContent = ships.length + ' shipments';
+
+  // ── Build table rows ──
+  var rows = ships.map(function(s) {
+    var recvAmt   = +(s.cust_amount_inr)||+(s.billing_amount)||0;
+    var vendorAmt = +(s.vendor_cost)||0;
+    var dutyAmt   = +(s.duty_amount)||0;
+    var totalCostS = vendorAmt + dutyAmt;
+    var margin    = recvAmt - totalCostS;
+    var mpct      = recvAmt > 0 ? Math.round(margin / recvAmt * 100) : 0;
+    var barW      = recvAmt > 0 ? Math.min(100, Math.max(0, mpct)) : 0;
+    var barColor  = margin > 0 ? 'var(--green)' : 'var(--red)';
+
+    // Row status flag
+    var flag, rowCls = '';
+    if (vendorAmt > 0 && s.billing_status !== 'Billed') {
+      flag = '<span class="pl-flag warn">⚠ Vendor unbilled</span>';
+      rowCls = 'pl-warn';
+    } else if (margin < 0) {
+      flag = '<span class="pl-flag bad">▼ Loss</span>';
+      rowCls = 'pl-loss';
+    } else if (recvAmt === 0) {
+      flag = '<span class="pl-flag gray">No invoice</span>';
+    } else {
+      flag = '<span class="pl-flag ok">✓ Profit</span>';
+    }
+
+    // Currency display
+    var curTag = '';
+    if (s.invoice_currency && s.invoice_currency !== 'INR' && s.invoice_value) {
+      curTag = ' <span class="cur-badge cur-'+s.invoice_currency.toLowerCase()+'">'+s.invoice_currency+' '+fmt(s.invoice_value)+'</span>';
+    }
+
+    var payTag = s.billing_status === 'Billed'
+      ? (s.payment_status === 'Received'
+          ? '<span class="badge b-gr" style="font-size:10px">Paid</span>'
+          : '<span class="badge b-am" style="font-size:10px">Unpaid</span>')
+      : '<span class="badge b-gy" style="font-size:10px">Unbilled</span>';
+
+    return '<tr class="'+rowCls+'" onclick="openDet(\''+s.id+'\')" style="cursor:pointer">' +
+      // Job + Customer
+      '<td>' +
+        '<div class="mono" style="font-size:11px;font-weight:700;color:var(--green-b)">'+s.job_number+'</div>' +
+        '<div style="font-size:12px;font-weight:600;color:var(--t1)">'+s.customer_name+'</div>' +
+        '<div style="font-size:10px;color:var(--t3);margin-top:1px">'+(s.invoice_number||'—')+'</div>' +
+      '</td>' +
+      // Mode + Route
+      '<td style="font-size:11px;color:var(--t2)">' +
+        modeTag(s.mode)+'<br>' +
+        '<span style="font-size:10px;color:var(--t3)">'+(s.pol||'—')+' → '+(s.pod||'—')+'</span>' +
+      '</td>' +
+      // Receivable
+      '<td>' +
+        '<div class="mono" style="font-size:14px;font-weight:700;color:var(--green-b)">'+
+          (recvAmt > 0 ? '₹'+fmt(recvAmt) : '<span style="color:var(--t3);font-size:12px">—</span>') +
+        '</div>' +
+        curTag +
+        '<div style="margin-top:4px">'+payTag+'</div>' +
+      '</td>' +
+      // Vendor cost
+      '<td>' +
+        (vendorAmt > 0 ?
+          '<div class="mono" style="font-size:14px;font-weight:700;color:var(--amber-b)">₹'+fmt(vendorAmt)+'</div>' +
+          '<div style="font-size:10px;color:var(--t3)">'+(s.vendor_name||'Vendor')+'</div>'
+          : '<span style="font-size:11px;color:var(--t3)">—</span>') +
+        (dutyAmt > 0 ?
+          '<div style="margin-top:3px"><span style="font-size:10px;color:var(--t3)">Duty: </span><span class="mono" style="font-size:11px;color:var(--purple)">₹'+fmt(dutyAmt)+'</span></div>'
+          : '') +
+      '</td>' +
+      // Margin
+      '<td style="min-width:120px">' +
+        '<div class="mono" style="font-size:14px;font-weight:700;color:'+(margin>=0?'var(--green-b)':'var(--red-b)')+'">'+
+          (recvAmt>0||totalCostS>0 ? (margin>=0?'+':'-')+'₹'+fmt(Math.abs(margin)) : '—') +
+        '</div>' +
+        (recvAmt > 0 ? '<div style="font-size:11px;color:var(--t3)">'+mpct+'% margin</div>' : '') +
+        (recvAmt > 0 ?
+          '<div class="pl-bar-wrap" style="margin-top:5px"><div class="pl-bar" style="width:'+barW+'%;background:'+barColor+'"></div></div>'
+          : '') +
+      '</td>' +
+      // Flag
+      '<td>'+flag+'</td>' +
+    '</tr>';
+  });
+
+  el.innerHTML =
+    // KPI strip
+    '<div class="pl-kpi-strip">' +
+      '<div class="pl-kpi">' +
+        '<div class="pl-kpi-lbl">Total Receivable</div>' +
+        '<div class="pl-kpi-val gr">₹'+fmt(totalRecv)+'</div>' +
+        '<div class="pl-kpi-sub">'+billed+'/'+ships.length+' billed · '+paid+' paid</div>' +
+      '</div>' +
+      '<div class="pl-kpi">' +
+        '<div class="pl-kpi-lbl">Total Vendor Cost</div>' +
+        '<div class="pl-kpi-val am">₹'+fmt(totalVendor)+'</div>' +
+        '<div class="pl-kpi-sub">Duty: ₹'+fmt(totalDuty)+'</div>' +
+      '</div>' +
+      '<div class="pl-kpi">' +
+        '<div class="pl-kpi-lbl">Net Margin</div>' +
+        '<div class="pl-kpi-val '+(totalMargin>=0?'gr':'rd')+'">'+( totalMargin>=0?'+':'-')+'₹'+fmt(Math.abs(totalMargin))+'</div>' +
+        '<div class="pl-kpi-sub">'+marginPct+'% of revenue</div>' +
+      '</div>' +
+      '<div class="pl-kpi">' +
+        '<div class="pl-kpi-lbl">Margin Bar</div>' +
+        '<div class="pl-kpi-val '+(marginPct>=30?'gr':marginPct>=10?'am':'rd')+'">'+marginPct+'%</div>' +
+        '<div class="pl-bar-wrap" style="margin-top:6px"><div class="pl-bar" style="width:'+Math.min(100,Math.max(0,marginPct))+'%;background:'+(marginPct>=30?'var(--green)':marginPct>=10?'var(--amber)':'var(--red)')+'"></div></div>' +
+      '</div>' +
+      '<div class="pl-kpi">' +
+        '<div class="pl-kpi-lbl">⚠ Needs Attention</div>' +
+        '<div class="pl-kpi-val '+(noBill>0?'rd':'gr')+'">'+noBill+'</div>' +
+        '<div class="pl-kpi-sub">vendor cost, not billed</div>' +
+      '</div>' +
+    '</div>' +
+    // Table
+    '<div style="overflow-x:auto"><table class="pl-tbl">' +
+      '<thead><tr>' +
+        '<th style="min-width:160px">Job / Customer</th>' +
+        '<th>Mode & Route</th>' +
+        '<th style="min-width:140px">📥 Receivable</th>' +
+        '<th style="min-width:130px">📤 Cost</th>' +
+        '<th style="min-width:130px">Margin</th>' +
+        '<th>Status</th>' +
+      '</tr></thead>' +
+      '<tbody>' + rows.join('') + '</tbody>' +
+      '<tfoot><tr style="background:var(--s2);font-weight:700">' +
+        '<td colspan="2" style="padding:10px 14px;font-size:12px">'+ships.length+' shipments total</td>' +
+        '<td style="padding:10px 14px"><span class="mono" style="color:var(--green-b);font-size:13px">₹'+fmt(totalRecv)+'</span></td>' +
+        '<td style="padding:10px 14px"><span class="mono" style="color:var(--amber-b);font-size:13px">₹'+fmt(totalCost)+'</span></td>' +
+        '<td style="padding:10px 14px"><span class="mono" style="font-size:13px;color:'+(totalMargin>=0?'var(--green-b)':'var(--red-b)')+'">₹'+fmt(Math.abs(totalMargin))+'</span></td>' +
+        '<td></td>' +
+      '</tr></tfoot>' +
+    '</table></div>';
+}
+
+// ── QUOTATION COMPARE ─────────────────────────────────────
+
+// ── QUOTATION COMPARE ─────────────────────────────────────
+var quotCompareOpen = false;
+function toggleQuotCompare() {
+  quotCompareOpen = !quotCompareOpen;
+  var panel = document.getElementById('quot-compare-panel');
+  if (!quotCompareOpen) { panel.style.display='none'; return; }
+  renderQuotCompare();
+  panel.style.display = 'block';
+}
+function renderQuotCompare() {
+  var quots = DB.quots.filter(function(q){ return q.status !== 'Rejected'; });
+  if (!quots.length) {
+    document.getElementById('quot-compare-panel').innerHTML = '<div class="t-empty" style="padding:1.5rem">No quotations to compare</div>';
+    return;
+  }
+  // Find best margin
+  var bestMargin = Math.max.apply(null, quots.map(function(q){ return (+(q.sell_amount)||0)+(+(q.gst_amount)||0)-(+(q.buy_cost)||0); }));
+  document.getElementById('quot-compare-panel').innerHTML =
+    '<div class="card" style="margin-bottom:12px"><div class="card-h"><span class="card-title">⚖ Quotation Comparison</span><span style="font-size:11px;color:var(--t3)">All active quotations side by side</span></div>' +
+    '<div class="quot-compare-wrap">' +
+    quots.map(function(q) {
+      var basic = +(q.sell_amount)||0;
+      var gst = +(q.gst_amount)||0;
+      var total = basic + gst;
+      var margin = total - (+(q.buy_cost)||0);
+      var mpct = (+(q.buy_cost)||0) > 0 ? Math.round(margin/(+(q.buy_cost))*100) : 0;
+      var isBest = margin === bestMargin && bestMargin > 0;
+      var units = +(q.units)||0;
+      return '<div class="quot-compare-card'+(isBest?' best':'')+'">' +
+        (isBest ? '<div class="best-tag">Best Margin ★</div>' : '') +
+        '<div class="qcc-header">'+(q.quote_number||'Quote')+'</div>' +
+        '<div style="font-size:12px;font-weight:600;margin-bottom:8px">'+(q.customer_name||'—')+'</div>' +
+        '<div style="font-size:11px;color:var(--t3);margin-bottom:8px">'+(q.origin||'?')+' → '+(q.destination||'?')+' · '+modeTag(q.mode)+'</div>' +
+        (q.job_number ? '<div style="font-size:11px;margin-bottom:8px">Job: <span class="mono" style="color:var(--green-b)">'+q.job_number+'</span></div>' : '') +
+        '<div class="qcc-row"><span class="qcc-label">Buy Cost</span><span class="qcc-val">₹'+fmt(+(q.buy_cost)||0)+'</span></div>' +
+        '<div class="qcc-row"><span class="qcc-label">Basic Sell</span><span class="qcc-val">₹'+fmt(basic)+'</span></div>' +
+        '<div class="qcc-row"><span class="qcc-label">GST</span><span class="qcc-val">₹'+fmt(gst)+'</span></div>' +
+        (units > 0 ? '<div class="qcc-row"><span class="qcc-label">Per Unit</span><span class="qcc-val" style="color:var(--purple)">₹'+fmt(total/units)+'</span></div>' : '') +
+        '<div class="qcc-total"><span>Total Sell</span><span style="color:var(--blue-b)">₹'+fmt(total)+'</span></div>' +
+        '<div style="margin-top:8px;padding:8px;background:var(--s2);border-radius:5px;display:flex;justify-content:space-between;align-items:center">' +
+          '<span style="font-size:11px;color:var(--t3)">Margin</span>' +
+          '<span class="mono '+(margin>=0?'margin-positive':'margin-negative')+'">₹'+fmt(Math.abs(margin))+' ('+mpct+'%)</span>' +
+        '</div>' +
+        '<div style="margin-top:8px">'+qsbadge(q.status)+'</div>' +
+      '</div>';
+    }).join('') +
+    '</div></div>';
+}
+
 // ── BILLING ───────────────────────────────────────────────
 function billTab(t, el) {
   document.getElementById('bill-recv-wrap').style.display = t==='recv' ? 'block' : 'none';
   document.getElementById('bill-pay-wrap').style.display = t==='pay' ? 'block' : 'none';
+  document.getElementById('bill-map-wrap').style.display = t==='map' ? 'block' : 'none';
   document.querySelectorAll('#pg-billing .tab').forEach(function(x){ x.classList.remove('active'); });
   if (el) el.classList.add('active');
-  renderBill(t);
+  if (t === 'map') renderBillMap();
+  else renderBill(t);
 }
 function renderBill(t) {
   var tid = t==='recv' ? 'bill-recv-t' : 'bill-pay-t';
@@ -1840,59 +2214,153 @@ function renderBill(t) {
   var q = (document.getElementById(qid)||{}).value || '';
   q = q.toLowerCase();
   var st = t==='recv' ? ((document.getElementById(stid)||{}).value||'') : '';
+
+  // Show ALL shipments (billing_amount is customer invoice in INR)
+  // Filter: no billing_amount filter — show all, unset ones just show "—"
   var data = DB.ships.filter(function(s) {
-    if (!s.billing_amount) return false;
-    if (q && (s.job_number+' '+s.customer_name+' '+(s.invoice_number||'')).toLowerCase().indexOf(q)<0) return false;
+    if (q && (s.job_number+' '+s.customer_name+' '+(s.invoice_number||'')+' '+(s.cust_invoice_no||'')).toLowerCase().indexOf(q)<0) return false;
     if (st==='Billed' && s.billing_status!=='Billed') return false;
     if (st==='Pending' && s.billing_status!=='Unbilled') return false;
     return true;
   });
-  var tot = data.reduce(function(a,s){ return a+(+(s.billing_amount)||0); }, 0);
-  var paid = data.filter(function(s){ return s.payment_status==='Received'; }).reduce(function(a,s){ return a+(+(s.billing_amount)||0); }, 0);
+
+  // Use cust_amount_inr as the real customer receivable; fall back to billing_amount
+  var tot = data.reduce(function(a,s){ return a+(+(s.cust_amount_inr)||+(s.billing_amount)||0); }, 0);
+  var paid = data.filter(function(s){ return s.payment_status==='Received'; }).reduce(function(a,s){ return a+(+(s.cust_amount_inr)||+(s.billing_amount)||0); }, 0);
   var el = document.getElementById(tid);
   if (!el) return;
+
   el.innerHTML =
     '<thead>' +
-      '<tr style="background:var(--s2)"><td colspan="8" style="padding:8px 12px;font-size:12px"><strong>Total: </strong><span class="mono">₹'+fmt(tot)+'</span><span style="color:var(--t3);margin-left:14px;font-size:11px">Received: ₹'+fmt(paid)+' | Outstanding: ₹'+fmt(tot-paid)+'</span></td></tr>' +
-      '<tr><th>Job No.</th><th>Customer</th><th>Invoice No.</th><th>Date</th><th>Amount</th><th>Billing</th><th>Payment</th><th></th></tr>' +
+      '<tr style="background:var(--s2)"><td colspan="10" style="padding:8px 12px;font-size:12px">' +
+        '<strong>Total (INR): </strong><span class="mono">₹'+fmt(tot)+'</span>' +
+        '<span style="color:var(--t3);margin-left:14px;font-size:11px">Received: ₹'+fmt(paid)+' | Outstanding: ₹'+fmt(tot-paid)+'</span>' +
+        '<button class="btn btn-xs btn-bl" style="margin-left:12px" onclick="openBillModal()">+ Add / Edit Invoice</button>' +
+      '</td></tr>' +
+      '<tr><th>Job No.</th><th>Customer</th><th>Cust. Invoice No.</th><th>Date</th>' +
+          '<th>Orig. Currency</th><th>Orig. Amount</th><th>Rate</th><th>INR Amount</th>' +
+          '<th>Status</th><th></th></tr>' +
     '</thead>' +
     '<tbody>'+
     (data.length ? data.map(function(s) {
-      return '<tr class="cr" onclick="openDet(\''+s.id+'\')">' +
-        '<td class="mono" style="color:var(--green-b);font-weight:700">'+s.job_number+'</td>' +
-        '<td style="font-weight:600">'+s.customer_name+'</td>' +
-        '<td class="mono" style="font-size:11px">'+(s.invoice_number||'—')+'</td>' +
-        '<td class="mono" style="font-size:11px">'+(s.shipment_date||'—')+'</td>' +
-        '<td class="mono" style="font-weight:700">₹'+fmt(+(s.billing_amount)||0)+'</td>' +
-        '<td>'+bbadge(s.billing_status)+'</td>' +
-        '<td>'+pbadge(s.payment_status)+'</td>' +
-        '<td onclick="event.stopPropagation()">'+(s.payment_status!=='Received'?'<button class="btn btn-xs btn-p" onclick="markStage(\''+s.id+'\',\'payment_received\')">Mark Paid</button>':'')+'</td>' +
+      var cur = s.cust_currency || s.invoice_currency || 'INR';
+      var origAmt = +(s.cust_amount_orig)||+(s.invoice_value)||0;
+      var rate = +(s.cust_exchange_rate)||+(s.exchange_rate)||1;
+      var inrAmt = +(s.cust_amount_inr)||+(s.billing_amount)||0;
+      var custInv = s.cust_invoice_no || s.invoice_number || '—';
+      var hasBilling = inrAmt > 0;
+      return '<tr class="cr'+(s.billing_status==='Unbilled'&&hasBilling?' vendor-pending':'')+'" onclick="openDet(\''+s.id+'\')">'+
+        '<td class="mono" style="color:var(--green-b);font-weight:700">'+s.job_number+'</td>'+
+        '<td style="font-weight:600">'+s.customer_name+'</td>'+
+        '<td class="mono" style="font-size:11px">'+custInv+'</td>'+
+        '<td class="mono" style="font-size:11px">'+(s.shipment_date||'—')+'</td>'+
+        '<td>'+(cur!=='INR'?'<span class="cur-badge cur-'+cur.toLowerCase()+'">'+cur+'</span>':'<span class="cur-badge cur-inr">INR</span>')+'</td>'+
+        '<td class="mono" style="font-size:12px">'+(origAmt>0?fmt(origAmt):'—')+'</td>'+
+        '<td class="mono" style="font-size:11px;color:var(--t3)">'+(cur!=='INR'&&rate>0&&rate!==1?fmt(rate):'—')+'</td>'+
+        '<td class="mono" style="font-weight:700;font-size:13px">'+(inrAmt>0?'₹'+fmt(inrAmt):'<span style="color:var(--t3)">Not set</span>')+'</td>'+
+        '<td>'+bbadge(s.billing_status)+' '+pbadge(s.payment_status)+'</td>'+
+        '<td onclick="event.stopPropagation()" style="white-space:nowrap">'+
+          '<button class="btn btn-xs btn-bl" onclick="openBillModal(\''+s.id+'\')">'+
+            (hasBilling?'✏ Edit':'+ Invoice')+
+          '</button>'+
+          (hasBilling&&s.payment_status!=='Received'?' <button class="btn btn-xs btn-p" onclick="markStage(\''+s.id+'\',\'payment_received\')">Mark Paid</button>':'')+
+        '</td>'+
         '</tr>';
-    }).join('') : '<tr><td colspan="8" class="t-empty">No records</td></tr>') +
+    }).join('') : '<tr><td colspan="10" class="t-empty">No shipments</td></tr>') +
     '</tbody>';
 }
-function openBillModal() {
+function openBillModal(shipId) {
+  var s = shipId ? DB.ships.find(function(x){ return x.id===shipId; }) : null;
+  var cur = (s && s.cust_currency) || (s && s.invoice_currency) || 'USD';
+  document.getElementById('mo-bill').querySelector('.mo-title').textContent = s ? ('Invoice — '+s.job_number) : 'Add Customer Invoice';
   document.getElementById('bill-form').innerHTML =
+    '<div class="fg" style="grid-template-columns:repeat(3,1fr)">' +
+    '<div class="fgi"><label class="fl">Job Number *</label>' +
+      '<select class="fi" id="bm_j" onchange="bmAutoFill()">' +
+        '<option value="">— Select Job —</option>' +
+        DB.ships.map(function(x){ return '<option value="'+x.id+'"'+(s&&s.id===x.id?' selected':'')+'>'+x.job_number+' · '+x.customer_name+'</option>'; }).join('') +
+      '</select>' +
+    '</div>' +
+    '<div class="fgi"><label class="fl">Customer Invoice No. *</label><input class="fi" id="bm_i" value="'+((s&&s.cust_invoice_no)||'')+'"></div>' +
+    '<div class="fgi"><label class="fl">Invoice Date</label><input class="fi" type="date" id="bm_d" value="'+((s&&s.shipment_date)||new Date().toISOString().slice(0,10))+'"></div>' +
+    '</div>' +
+    '<div style="background:var(--amber-l);border:1px solid var(--amber);border-radius:6px;padding:12px 14px;margin:12px 0">' +
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--amber-b);margin-bottom:10px">💱 Invoice Currency & Amount</div>' +
+      '<div class="fg" style="grid-template-columns:repeat(4,1fr)">' +
+        '<div class="fgi"><label class="fl">Currency</label>' +
+          '<select class="fi" id="bm_cur" onchange="bmCalcINR()">' +
+            ['USD','INR','GBP','EUR','AED','CNY','JPY','SGD'].map(function(c){ return '<option'+(c===cur?' selected':'')+'>'+c+'</option>'; }).join('') +
+          '</select>' +
+        '</div>' +
+        '<div class="fgi"><label class="fl">Amount (Orig. Currency)</label><input class="fi" type="number" id="bm_orig" value="'+((s&&s.cust_amount_orig)||'')+'" oninput="bmCalcINR()" placeholder="e.g. 1500.00"></div>' +
+        '<div class="fgi"><label class="fl">Exchange Rate (to ₹)</label><input class="fi" type="number" id="bm_rate" value="'+((s&&s.cust_exchange_rate)||'')+'" oninput="bmCalcINR()" placeholder="e.g. 84.50"></div>' +
+        '<div class="fgi"><label class="fl">INR Amount ₹</label>' +
+          '<input class="fi" type="number" id="bm_inr" value="'+((s&&s.cust_amount_inr)||(s&&s.billing_amount)||'')+'" oninput="bmManualINR()" style="font-weight:700;color:var(--green-b)">' +
+        '</div>' +
+      '</div>' +
+      '<div style="font-size:11px;color:var(--amber-b);margin-top:8px">Enter original currency amount + exchange rate → INR auto-calculates. Or type INR directly.</div>' +
+    '</div>' +
     '<div class="fg2">' +
-    '<div class="fgi"><label class="fl">Job Number</label><input class="fi" id="bm_j" list="bm-jl"><datalist id="bm-jl">'+DB.ships.map(function(s){ return '<option value="'+s.job_number+'">'; }).join('')+'</datalist></div>' +
-    '<div class="fgi"><label class="fl">Invoice No.</label><input class="fi" id="bm_i"></div>' +
-    '<div class="fgi"><label class="fl">Amount (₹)</label><input class="fi" type="number" id="bm_a"></div>' +
-    '<div class="fgi"><label class="fl">Date</label><input class="fi" type="date" id="bm_d" value="'+new Date().toISOString().slice(0,10)+'"></div>' +
+    '<div class="fgi"><label class="fl">Billing Status</label><select class="fi" id="bm_bs"><option value="Billed"'+((!s||s.billing_status==='Billed')?' selected':'')+'>Billed</option><option value="Unbilled"'+(s&&s.billing_status==='Unbilled'?' selected':'')+'>Unbilled</option></select></div>' +
+    '<div class="fgi"><label class="fl">Payment Status</label><select class="fi" id="bm_ps"><option value="Pending"'+((!s||s.payment_status==='Pending')?' selected':'')+'>Pending</option><option value="Received"'+(s&&s.payment_status==='Received'?' selected':'')+'>Received</option></select></div>' +
     '</div>';
   openMo('mo-bill');
 }
+function bmAutoFill() {
+  var sid = (document.getElementById('bm_j')||{}).value;
+  var s = DB.ships.find(function(x){ return x.id===sid; });
+  if (!s) return;
+  var invEl = document.getElementById('bm_i'); if(invEl&&!invEl.value) invEl.value = s.cust_invoice_no||s.invoice_number||'';
+  var curEl = document.getElementById('bm_cur'); if(curEl&&s.cust_currency) curEl.value = s.cust_currency;
+  else if(curEl&&s.invoice_currency) curEl.value = s.invoice_currency;
+  var origEl = document.getElementById('bm_orig'); if(origEl&&s.cust_amount_orig) origEl.value = s.cust_amount_orig;
+  else if(origEl&&s.invoice_value) origEl.value = s.invoice_value;
+  var rateEl = document.getElementById('bm_rate'); if(rateEl&&s.cust_exchange_rate) rateEl.value = s.cust_exchange_rate;
+  else if(rateEl&&s.exchange_rate) rateEl.value = s.exchange_rate;
+  var inrEl = document.getElementById('bm_inr'); if(inrEl&&s.cust_amount_inr) inrEl.value = s.cust_amount_inr;
+  else if(inrEl&&s.billing_amount) inrEl.value = s.billing_amount;
+  bmCalcINR();
+}
+function bmCalcINR() {
+  var orig = +(document.getElementById('bm_orig')||{}).value||0;
+  var rate = +(document.getElementById('bm_rate')||{}).value||0;
+  var cur = (document.getElementById('bm_cur')||{}).value||'INR';
+  var inrEl = document.getElementById('bm_inr');
+  if (!inrEl) return;
+  if (cur === 'INR') { if(orig>0) inrEl.value = orig; return; }
+  if (orig > 0 && rate > 0) inrEl.value = Math.round(orig * rate);
+}
+function bmManualINR() {
+  // user typed INR directly — clear rate so no conflict
+}
 async function saveBill() {
-  var jn = (document.getElementById('bm_j')||{}).value || '';
-  var s = DB.ships.find(function(x){ return x.job_number === jn; });
-  if (s) {
-    s.billing_status = 'Billed';
-    var amtEl = document.getElementById('bm_a');
-    var invEl = document.getElementById('bm_i');
-    if (amtEl && amtEl.value) s.billing_amount = +amtEl.value;
-    if (invEl && invEl.value) s.invoice_number = invEl.value;
-    try { await dbU('shipments', s); } catch(e) { toast('Error: '+e.message,'err'); return; }
-  }
-  toast('Saved ✓','ok'); closeMo('mo-bill'); renderAll();
+  var sid = (document.getElementById('bm_j')||{}).value || '';
+  var s = DB.ships.find(function(x){ return x.id === sid; });
+  if (!s) { toast('Select a job number','err'); return; }
+  var custInv = (document.getElementById('bm_i')||{}).value || '';
+  var cur = (document.getElementById('bm_cur')||{}).value || 'INR';
+  var origAmt = (document.getElementById('bm_orig')||{}).value;
+  var rate = (document.getElementById('bm_rate')||{}).value;
+  var inrAmt = (document.getElementById('bm_inr')||{}).value;
+  var bStatus = (document.getElementById('bm_bs')||{}).value || 'Billed';
+  var pStatus = (document.getElementById('bm_ps')||{}).value || 'Pending';
+  if (!inrAmt || +inrAmt <= 0) { toast('Enter INR amount','err'); return; }
+  // Store customer invoice fields separately from shipment cost fields
+  s.cust_invoice_no = custInv || s.invoice_number;
+  s.cust_currency = cur;
+  s.cust_amount_orig = origAmt ? +origAmt : null;
+  s.cust_exchange_rate = rate ? +rate : null;
+  s.cust_amount_inr = +inrAmt;
+  s.billing_amount = +inrAmt;  // keep billing_amount in sync as INR total
+  s.billing_status = bStatus;
+  s.payment_status = pStatus;
+  if (custInv) s.invoice_number = custInv;
+  try {
+    await dbU('shipments', s);
+    toast('Invoice saved ✓','ok');
+    closeMo('mo-bill');
+    renderAll();
+  } catch(e) { toast('Error: '+e.message,'err'); }
 }
 
 // ── PAYMENTS ──────────────────────────────────────────────
@@ -2011,7 +2479,7 @@ function renderRpt() {
 }
 
 // ── SETTINGS ──────────────────────────────────────────────
-var SQL_SCHEMA = 'create table if not exists shipments (\n  id text primary key,\n  job_number text unique not null,\n  shipment_date date, customer_name text, shipper_name text,\n  consignee_name text, shipment_type text, mode text,\n  pol text, pod text, final_destination text, commodity text,\n  packages int, gross_weight numeric, chargeable_weight numeric, volume numeric,\n  invoice_number text, mawb_hawb text, mbl_hbl text, airline_shipping_line text,\n  etd date, eta date, actual_departure date, actual_arrival date,\n  cha_name text, vendor_name text,\n  duty_amount numeric default 0, billing_amount numeric default 0, vendor_cost numeric default 0,\n  current_stage text default \'inquiry_received\', stages jsonb default \'{}\',\n  billing_status text default \'Unbilled\', payment_status text default \'Pending\',\n  pod_status text default \'POD Pending\', pending_with text, next_action text,\n  target_date date, remarks text,\n  doc_checklist boolean default false, doc_ci boolean default false,\n  doc_pl boolean default false, doc_kyc boolean default false,\n  doc_gst_iec boolean default false, doc_shipping_bill boolean default false,\n  doc_remarks text, created_at timestamptz default now()\n);\ncreate table if not exists quotations (\n  id text primary key, quote_number text, date date,\n  customer_name text, origin text, destination text, mode text,\n  buy_cost numeric default 0, sell_amount numeric default 0,\n  status text default \'Draft\', notes text, charges jsonb default \'[]\',\n  created_at timestamptz default now()\n);\ncreate table if not exists payments (\n  id text primary key, job_number text, party text,\n  invoice_number text, type text, amount numeric default 0,\n  date date, due_date date, status text default \'Pending\',\n  paid_date date, created_at timestamptz default now()\n);\ncreate table if not exists activity (\n  id text primary key, text text, type text,\n  shipment_id text, created_at timestamptz default now()\n);\n\n-- Enable RLS with open access (customize for your auth):\nalter table shipments enable row level security;\nalter table quotations enable row level security;\nalter table payments enable row level security;\nalter table activity enable row level security;\ncreate policy "open" on shipments for all using (true) with check (true);\ncreate policy "open" on quotations for all using (true) with check (true);\ncreate policy "open" on payments for all using (true) with check (true);\ncreate policy "open" on activity for all using (true) with check (true);';
+var SQL_SCHEMA = 'create table if not exists shipments (\n  id text primary key,\n  job_number text unique not null,\n  shipment_date date, customer_name text, shipper_name text,\n  consignee_name text, shipment_type text, mode text,\n  pol text, pod text, final_destination text, commodity text,\n  packages int, gross_weight numeric, chargeable_weight numeric, volume numeric,\n  invoice_number text, invoice_currency text default \'INR\', invoice_value numeric, exchange_rate numeric, invoice_value_inr numeric, mawb_hawb text, mbl_hbl text, airline_shipping_line text,\n  etd date, eta date, actual_departure date, actual_arrival date,\n  cha_name text, vendor_name text,\n  duty_amount numeric default 0, billing_amount numeric default 0, vendor_cost numeric default 0, cust_invoice_no text, cust_currency text, cust_amount_orig numeric, cust_exchange_rate numeric, cust_amount_inr numeric,\n  current_stage text default \'inquiry_received\', stages jsonb default \'{}\',\n  billing_status text default \'Unbilled\', payment_status text default \'Pending\',\n  pod_status text default \'POD Pending\', pending_with text, next_action text,\n  target_date date, remarks text,\n  doc_checklist boolean default false, doc_ci boolean default false,\n  doc_pl boolean default false, doc_kyc boolean default false,\n  doc_gst_iec boolean default false, doc_shipping_bill boolean default false,\n  doc_remarks text, created_at timestamptz default now()\n);\ncreate table if not exists quotations (\n  id text primary key, quote_number text, date date,\n  customer_name text, origin text, destination text, mode text,\n  buy_cost numeric default 0, sell_amount numeric default 0,\n  status text default \'Draft\', notes text, charges jsonb default \'[]\',\n  created_at timestamptz default now()\n);\ncreate table if not exists payments (\n  id text primary key, job_number text, party text,\n  invoice_number text, type text, amount numeric default 0,\n  date date, due_date date, status text default \'Pending\',\n  paid_date date, created_at timestamptz default now()\n);\ncreate table if not exists activity (\n  id text primary key, text text, type text,\n  shipment_id text, created_at timestamptz default now()\n);\n\n-- Enable RLS with open access (customize for your auth):\nalter table shipments enable row level security;\nalter table quotations enable row level security;\nalter table payments enable row level security;\nalter table activity enable row level security;\ncreate policy "open" on shipments for all using (true) with check (true);\ncreate policy "open" on quotations for all using (true) with check (true);\ncreate policy "open" on payments for all using (true) with check (true);\ncreate policy "open" on activity for all using (true) with check (true);';
 
 function renderSettings() {
   document.getElementById('set-body').innerHTML =
