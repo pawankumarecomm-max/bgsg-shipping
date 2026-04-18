@@ -308,6 +308,21 @@ tr.row-intransit td { background: #fef3c7 !important; }
 tr.row-intransit:hover td { background: #fde68a !important; }
 tr.row-intransit td:first-child { border-left: 3px solid var(--amber); }
 
+/* Shipment table compact fit */
+#shipments-table { table-layout:fixed; width:100%; }
+#shipments-table thead th,
+#shipments-table tbody td { padding:7px 8px; font-size:11px; white-space:normal; word-break:break-word; vertical-align:top; }
+#shipments-table thead th { font-size:9.5px; }
+#shipments-table .mono { font-size:10.5px !important; }
+#shipments-table .badge,
+#shipments-table .tag,
+#shipments-table .cur-badge { font-size:9px; }
+#shipments-table .ship-cell-ell { display:block; overflow:hidden; text-overflow:ellipsis; }
+#shipments-table .ship-status-cell { font-size:10.5px !important; font-weight:700; }
+#shipments-table .ship-status-transit { color:var(--amber-b) !important; }
+#shipments-table .ship-status-delivered { color:var(--green-b) !important; }
+#shipments-table .ship-status-other { color:var(--t3) !important; }
+
 /* Currency badge */
 .cur-badge { display:inline-flex; align-items:center; gap:3px; padding:1px 5px; border-radius:3px; font-size:10px; font-weight:700; background:var(--s2); border:1px solid var(--b1); color:var(--t2); font-family:'JetBrains Mono',monospace; }
 .cur-inr { background:#f0fdf4; border-color:#86efac; color:#166534; }
@@ -471,7 +486,7 @@ tr.row-intransit td:first-child { border-left: 3px solid var(--amber); }
         <span class="fc" id="ship-count"></span>
       </div>
       <div class="card">
-        <div class="tw"><table><thead id="ship-th"></thead><tbody id="ship-tb"></tbody></table></div>
+        <div class="tw"><table id="shipments-table"><thead id="ship-th"></thead><tbody id="ship-tb"></tbody></table></div>
         <div class="pgn" id="ship-pgn"></div>
       </div>
     </div>
@@ -1165,7 +1180,7 @@ function renderDash() {
     {key:'active', lbl:'Total Active', val:s.filter(function(x){return x.current_stage!=='file_closed';}).length, cls:'bl', sub:'in progress', hint:'Open shipments list'},
     {key:'docs', lbl:'Pending Docs', val:s.filter(function(x){return hasPendingDocs(x);}).length, cls:'am', sub:'need docs', hint:'Open incomplete documentation'},
     {key:'customs', lbl:'Customs Pending', val:s.filter(function(x){var i=SIDS.indexOf(x.current_stage);return i>=SIDS.indexOf('cargo_handed_over')&&i<SIDS.indexOf('customs_cleared');}).length, cls:'', sub:'awaiting clearance', hint:'Open customs view'},
-    {key:'delivery', lbl:'Intransit', val:s.filter(function(x){return x.current_stage==='intransit';}).length, cls:'te', sub:'cargo moving', hint:'Open intransit shipments'},
+    {key:'delivery', lbl:'Intransit', val:s.filter(function(x){return isShipInTransit(x);}).length, cls:'te', sub:'cargo moving', hint:'Open intransit shipments'},
     {key:'pod', lbl:'POD Pending', val:s.filter(function(x){return x.pod_status==='POD Pending'&&SIDS.indexOf(x.current_stage)>=SIDS.indexOf('delivered');}).length, cls:'am', sub:'awaiting proof', hint:'Open POD pending list'},
     {key:'billing', lbl:'Billing Pending', val:s.filter(function(x){return x.billing_status==='Unbilled'&&SIDS.indexOf(x.current_stage)>=SIDS.indexOf('delivered');}).length, cls:'am', sub:'unbilled', hint:'Open pending billing list'},
     {key:'payment', lbl:'Payment Pending', val:s.filter(function(x){return x.payment_status==='Pending'&&x.billing_status==='Billed';}).length, cls:'rd', sub:'awaiting payment', hint:'Open payment pending shipments'},
@@ -1186,7 +1201,7 @@ function renderDash() {
         '<td><span class="mono" style="color:var(--green-b);font-weight:700">'+x.job_number+'</span></td>' +
         '<td style="max-width:130px;overflow:hidden;text-overflow:ellipsis">'+x.customer_name+'</td>' +
         '<td>'+modeTag(x.mode)+'</td>' +
-        '<td style="font-size:11px;color:var(--t3)">'+slbl(x.current_stage)+'</td>' +
+        '<td style="font-size:11px;color:var(--t3)">'+shipStatusLabel(x)+'</td>' +
         '<td class="mono" style="font-size:11px">'+(x.etd||'—')+'</td>' +
         '<td>'+pbadge(x.payment_status)+'</td>' +
         '</tr>';
@@ -1235,6 +1250,26 @@ function renderDash() {
 }
 
 // ── SHIPMENTS TABLE ───────────────────────────────────────
+function isShipDelivered(s) {
+  var idx = SIDS.indexOf(normalizeStageId((s && s.current_stage) || ''));
+  if (idx >= SIDS.indexOf('delivered')) return true;
+  if (s && s.stages && s.stages.delivered) return true;
+  if ((s && s.pod_status) === 'Delivered' || (s && s.pod_status) === 'POD Received') return true;
+  return false;
+}
+function isShipInTransit(s) {
+  return !!s && !isShipDelivered(s);
+}
+function shipStatusLabel(s) {
+  if (isShipDelivered(s)) return 'Delivered';
+  if (isShipInTransit(s)) return 'Intransit';
+  return slbl(s.current_stage);
+}
+function shipStatusClass(s) {
+  if (isShipDelivered(s)) return 'ship-status-delivered';
+  if (isShipInTransit(s)) return 'ship-status-transit';
+  return 'ship-status-other';
+}
 function renderShips() {
   var q = (document.getElementById('sf-q').value || '').toLowerCase();
   var type = document.getElementById('sf-type').value || '';
@@ -1251,7 +1286,13 @@ function renderShips() {
     if (q && !(s.job_number+' '+s.customer_name+' '+(s.invoice_number||'')+' '+(s.consignee_name||'')+' '+(s.pol||'')+' '+(s.pod||'')+' '+(s.commodity||'')).toLowerCase().includes(q)) return false;
     if (type && s.shipment_type !== type) return false;
     if (mode && s.mode !== mode) return false;
-    if (stage && s.current_stage !== stage) return false;
+    if (stage) {
+      if (stage === 'intransit') {
+        if (!isShipInTransit(s)) return false;
+      } else if (stage === 'delivered') {
+        if (!isShipDelivered(s)) return false;
+      } else if (s.current_stage !== stage) return false;
+    }
     if (pod && s.pod_status !== pod) return false;
     if (bill && s.billing_status !== bill) return false;
     if (pay && s.payment_status !== pay) return false;
@@ -1277,24 +1318,26 @@ function renderShips() {
   }).join('') + '</tr>';
 
   document.getElementById('ship-tb').innerHTML = slice.length ? slice.map(function(s) {
-    var isTransit = (s.current_stage === 'intransit');
+    var isTransit = isShipInTransit(s);
     var rowCls = 'cr' + (isTransit ? ' row-intransit' : '');
+    var statusTxt = shipStatusLabel(s);
+    var statusCls = shipStatusClass(s);
     return '<tr class="'+rowCls+'" onclick="openDet(\''+s.id+'\')">'+
-      '<td><span class="mono" style="color:var(--green-b);font-weight:700">'+(s.job_number||'—')+'</span></td>'+
-      '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;font-weight:600" title="'+esc(s.customer_name||'')+'">'+(s.customer_name||'—')+'</td>'+
-      '<td class="mono" style="font-size:11px">'+(s.shipment_date||'—')+'</td>'+
-      '<td class="mono" style="font-size:11px">'+(s.invoice_number||'—')+'</td>'+
-      '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis" title="'+esc(s.consignee_name||'')+'">'+(s.consignee_name||'—')+'</td>'+
-      '<td style="font-size:12px">'+(s.pol||'—')+'</td>'+
-      '<td style="font-size:12px">'+(s.pod||'—')+'</td>'+
+      '<td><span class="mono ship-cell-ell" style="color:var(--green-b);font-weight:700" title="'+esc(s.job_number||'')+'">'+(s.job_number||'—')+'</span></td>'+
+      '<td><span class="ship-cell-ell" style="font-weight:600" title="'+esc(s.customer_name||'')+'">'+(s.customer_name||'—')+'</span></td>'+
+      '<td class="mono">'+(s.shipment_date||'—')+'</td>'+
+      '<td class="mono"><span class="ship-cell-ell" title="'+esc(s.invoice_number||'')+'">'+(s.invoice_number||'—')+'</span></td>'+
+      '<td><span class="ship-cell-ell" title="'+esc(s.consignee_name||'')+'">'+(s.consignee_name||'—')+'</span></td>'+
+      '<td><span class="ship-cell-ell" title="'+esc(s.pol||'')+'">'+(s.pol||'—')+'</span></td>'+
+      '<td><span class="ship-cell-ell" title="'+esc(s.pod||'')+'">'+(s.pod||'—')+'</span></td>'+
       '<td>'+modeTag(s.mode)+'</td>'+
-      '<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis" title="'+esc(s.commodity||'')+'">'+(s.commodity||'—')+'</td>'+
-      '<td class="mono" style="font-size:11px;'+(s.eta&&s.eta<today?'color:var(--red-b)':'')+'">'+(s.eta||'—')+'</td>'+
-      '<td style="font-size:11px;color:var(--t3)">'+slbl(s.current_stage)+'</td>'+
-      '<td>'+(s.invoice_currency?'<span class="cur-badge cur-'+String(s.invoice_currency).toLowerCase()+'">'+s.invoice_currency+'</span>':'—')+(s.invoice_value?' <span class="mono" style="font-size:11px">'+fmt(s.invoice_value)+'</span>':'')+'</td>'+
+      '<td><span class="ship-cell-ell" title="'+esc(s.commodity||'')+'">'+(s.commodity||'—')+'</span></td>'+
+      '<td class="mono" style="'+(s.eta&&s.eta<today?'color:var(--red-b)':'')+'">'+(s.eta||'—')+'</td>'+
+      '<td class="ship-status-cell '+statusCls+'">'+statusTxt+'</td>'+
+      '<td>'+(s.invoice_currency?'<span class="cur-badge cur-'+String(s.invoice_currency).toLowerCase()+'">'+s.invoice_currency+'</span>':'—')+'</td>'+
       '<td>'+bbadge(s.billing_status)+'</td>'+
       '</tr>';
-  }).join('') : '<tr><td colspan="12" class="t-empty">No shipments found</td></tr>';
+  }).join('') : '<tr><td colspan="13" class="t-empty">No shipments found</td></tr>';
 
   var pg = '<span>'+data.length+' records · Page '+sPage+'/'+pages+'</span>';
   if (sPage > 1) pg += '<div class="pgn-n" onclick="sPage--;renderShips()">‹</div>';
@@ -1304,6 +1347,7 @@ function renderShips() {
   if (sPage < pages) pg += '<div class="pgn-n" onclick="sPage++;renderShips()">›</div>';
   document.getElementById('ship-pgn').innerHTML = pg;
 }
+
 function setSort(c) { if(sSort===c){ sDir=sDir==='asc'?'desc':'asc'; } else { sSort=c; sDir='asc'; } renderShips(); }
 function clearFilters() {
   ['sf-q','sf-type','sf-mode','sf-stage','sf-pod','sf-bill','sf-pay','sf-from','sf-to'].forEach(function(id){
@@ -2719,7 +2763,7 @@ function gsearchRun(q) {
   dd.innerHTML = res.length ? res.map(function(s) {
     return '<div class="srch-row" onclick="openDet(\''+s.id+'\');document.getElementById(\'gsearch\').value=\'\';document.getElementById(\'gsdd\').classList.remove(\'open\')">' +
       '<div class="srch-main"><span class="mono" style="color:var(--green-b)">'+s.job_number+'</span> — '+s.customer_name+'</div>' +
-      '<div class="srch-sub">'+( s.mode||'')+' · '+(s.pol||'')+'→'+(s.pod||'')+' · '+slbl(s.current_stage)+'</div>' +
+      '<div class="srch-sub">'+( s.mode||'')+' · '+(s.pol||'')+'→'+(s.pod||'')+' · '+shipStatusLabel(s)+'</div>' +
       '</div>';
   }).join('') : '<div class="srch-row"><div class="srch-sub">No results for "'+q+'"</div></div>';
   dd.classList.add('open');
@@ -2729,7 +2773,7 @@ function gsearchRun(q) {
 function exportCSV() {
   var H = ['Job Number','Customer Name','Date of Invoice','Commercial Invoice','Consignee','Origin Country','Destination Country','Transport Mode','SKU Details','ETA','Status','Billing Status'];
   var rows = DB.ships.map(function(s) {
-    return [s.job_number,s.customer_name,s.shipment_date,s.invoice_number,s.consignee_name,s.pol,s.pod,s.mode,s.commodity,s.eta,slbl(s.current_stage),s.billing_status];
+    return [s.job_number,s.customer_name,s.shipment_date,s.invoice_number,s.consignee_name,s.pol,s.pod,s.mode,s.commodity,s.eta,shipStatusLabel(s),s.billing_status];
   });
   var csv = [H].concat(rows).map(function(r){ return r.map(function(c){ return '"'+(c||'')+'"'; }).join(','); }).join('\n');
   var a = document.createElement('a');
