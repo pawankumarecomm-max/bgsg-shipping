@@ -463,28 +463,57 @@ tr.row-intransit td:first-child { border-left: 3px solid var(--amber); }
         <div><div class="sh-title">Dashboard</div><div class="sh-sub" id="today-txt"></div></div>
         <button class="btn btn-sm" onclick="renderDash()">↻ Refresh</button>
       </div>
+      <!-- KPI Row 1 -->
       <div class="kpi-grid" id="kpi1"></div>
+      <!-- KPI Row 2 -->
       <div class="kpi-grid" id="kpi2"></div>
+      <!-- Revenue + Collection summary strip -->
+      <div id="dash-fin-strip" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px"></div>
+      <!-- Main content area -->
       <div class="dg">
         <div class="card">
-          <div class="card-h"><span class="card-title">Recent Shipments</span><button class="btn btn-sm" onclick="nav('shipments')">View All →</button></div>
+          <div class="card-h" style="justify-content:space-between">
+            <span class="card-title">📦 Recent Shipments</span>
+            <button class="btn btn-sm" onclick="nav('shipments')">View All →</button>
+          </div>
           <div class="tw" id="dash-recent"></div>
         </div>
         <div>
           <div class="card" style="margin-bottom:12px">
-            <div class="card-h"><span class="card-title">By Mode</span></div>
+            <div class="card-h"><span class="card-title">📊 By Mode</span></div>
             <div class="card-b" id="dash-mode"></div>
           </div>
           <div class="card">
-            <div class="card-h"><span class="card-title">Follow-up Today</span></div>
+            <div class="card-h"><span class="card-title">🔔 Follow-up Today</span></div>
             <div id="dash-followup"></div>
           </div>
         </div>
       </div>
+      <!-- Bottom row -->
       <div class="dg3">
-        <div class="card"><div class="card-h"><span class="card-title">Overdue</span></div><div id="dash-overdue"></div></div>
-        <div class="card"><div class="card-h"><span class="card-title">Stage Distribution</span></div><div class="card-b" id="dash-stage"></div></div>
-        <div class="card"><div class="card-h"><span class="card-title">Recent Activity</span></div><div id="dash-activity" style="max-height:200px;overflow-y:auto"></div></div>
+        <div class="card">
+          <div class="card-h"><span class="card-title">🚨 Overdue</span></div>
+          <div id="dash-overdue"></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><span class="card-title">📈 Stage Distribution</span></div>
+          <div class="card-b" id="dash-stage"></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><span class="card-title">⚡ Recent Activity</span></div>
+          <div id="dash-activity" style="max-height:200px;overflow-y:auto"></div>
+        </div>
+      </div>
+      <!-- Top customers strip -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div class="card" style="margin-bottom:0">
+          <div class="card-h"><span class="card-title">🏆 Top Customers by Revenue</span></div>
+          <div class="card-b" id="dash-top-cust"></div>
+        </div>
+        <div class="card" style="margin-bottom:0">
+          <div class="card-h"><span class="card-title">💳 Payment Health</span></div>
+          <div class="card-b" id="dash-pay-health"></div>
+        </div>
       </div>
     </div>
 
@@ -628,17 +657,27 @@ tr.row-intransit td:first-child { border-left: 3px solid var(--amber); }
         <div class="tab" id="bill-tab-map" onclick="billTab('map',this)">📊 P&amp;L Map</div>
       </div>
       <div id="bill-main-wrap">
-        <div class="fb">
-          <input id="billf-q" placeholder="🔍 Search job / customer / invoice…" style="min-width:240px">
-          <select id="billf-st">
+        <div class="fb" style="gap:5px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px">
+          <input id="billf-q" placeholder="🔍 Search…" style="min-width:160px;max-width:200px">
+          <select id="billf-st" style="min-width:130px">
             <option value="">All Status</option>
-            <option value="logi-pending">Logistics — Pending</option>
-            <option value="logi-received">Logistics — Received</option>
+            <option value="logi-pending">Logi — Pending</option>
+            <option value="logi-received">Logi — Received</option>
             <option value="vendor-unpaid">Vendor — Unpaid</option>
             <option value="vendor-paid">Vendor — Paid</option>
-            <option value="no-logi">No Logistics Invoice</option>
+            <option value="no-logi">No Invoice</option>
+            <option value="delivered-unbilled">🔴 Delivered, Unbilled</option>
           </select>
-          <span class="fc" id="bill-main-count"></span>
+          <select id="billf-cust" style="min-width:120px"><option value="">All Customers</option></select>
+          <select id="billf-mode" style="min-width:100px"><option value="">All Modes</option><option>Air</option><option>Sea LCL</option><option>Sea FCL</option><option>Road</option></select>
+          <select id="billf-ship-status" style="min-width:120px">
+            <option value="">All Ship. Status</option>
+            <option value="in-transit">In Transit</option>
+            <option value="delivered">Delivered</option>
+            <option value="pod-received">POD Received</option>
+          </select>
+          <button class="btn btn-sm" onclick="clearBillFilters()" style="white-space:nowrap;flex-shrink:0">✕</button>
+          <span class="fc" id="bill-main-count" style="white-space:nowrap;flex-shrink:0"></span>
         </div>
         <div class="card"><div class="tw"><table id="bill-main-t"></table></div></div>
       </div>
@@ -655,6 +694,12 @@ tr.row-intransit td:first-child { border-left: 3px solid var(--amber); }
         <button class="btn btn-p" onclick="openPayModal()">+ Add Payment</button>
       </div>
       <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)" id="pay-kpis"></div>
+      <!-- Charts row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px" id="pay-charts-row">
+        <div class="card" style="margin-bottom:0"><div class="card-h"><span class="card-title">Collection Progress</span></div><div class="card-b" id="pay-chart-donut" style="display:flex;align-items:center;justify-content:center;min-height:140px"></div></div>
+        <div class="card" style="margin-bottom:0"><div class="card-h"><span class="card-title">Customer Pending</span></div><div class="card-b" id="pay-chart-cust" style="min-height:140px;overflow-y:auto"></div></div>
+        <div class="card" style="margin-bottom:0"><div class="card-h"><span class="card-title">Vendor Payables</span></div><div class="card-b" id="pay-chart-vendor" style="min-height:140px;overflow-y:auto"></div></div>
+      </div>
       <div class="card"><div class="tw">
         <table><thead><tr><th>Date</th><th>Job No.</th><th>Party</th><th>Invoice</th><th>Type</th><th>Amount</th><th>Due Date</th><th>Status</th><th></th></tr></thead>
         <tbody id="pay-tb"></tbody></table>
@@ -958,7 +1003,7 @@ window.addEventListener('load', function() {
   ['docf-q','docf-st'].forEach(function(id){ var el=document.getElementById(id); if(el){el.addEventListener('input',renderDocs);el.addEventListener('change',renderDocs);} });
   ['custf-q','custf-st'].forEach(function(id){ var el=document.getElementById(id); if(el){el.addEventListener('input',renderCust);el.addEventListener('change',renderCust);} });
   ['delf-q','delf-st'].forEach(function(id){ var el=document.getElementById(id); if(el){el.addEventListener('input',renderDel);el.addEventListener('change',renderDel);} });
-  ['billf-q','billf-st'].forEach(function(id){ var el=document.getElementById(id); if(el){el.addEventListener('input',renderBillMain);el.addEventListener('change',renderBillMain);} });
+  ['billf-q','billf-st','billf-cust','billf-mode','billf-ship-status'].forEach(function(id){ var el=document.getElementById(id); if(el){el.addEventListener('input',renderBillMain);el.addEventListener('change',renderBillMain);} });
   var bmq=document.getElementById('billf-qmap'); if(bmq){ bmq.addEventListener('input',renderBillMap); }
 
   // ESC closes modals
@@ -1228,7 +1273,14 @@ function updateBadges() {
   document.getElementById('b-active').textContent = s.filter(function(x){ return x.current_stage !== 'file_closed'; }).length;
   document.getElementById('b-docs').textContent = s.filter(function(x){ return hasPendingDocs(x); }).length;
   document.getElementById('b-pod').textContent = s.filter(function(x){ return x.pod_status === 'POD Pending' && SIDS.indexOf(x.current_stage) >= SIDS.indexOf('delivered'); }).length;
-  document.getElementById('b-bill').textContent = s.filter(function(x){ return x.billing_status === 'Unbilled' && SIDS.indexOf(x.current_stage) >= SIDS.indexOf('delivered'); }).length;
+  document.getElementById('b-bill').textContent = s.filter(function(x){
+    var logiAmt = +(x.cust_amount_inr)||+(x.billing_amount)||0;
+    if (logiAmt > 0) return false;
+    var stIdx = SIDS.indexOf(normalizeStageId(x.current_stage));
+    return stIdx >= SIDS.indexOf('delivered') ||
+      (x.pod_status === 'Delivered' || x.pod_status === 'POD Received') ||
+      (x.stages && (x.stages.delivered || x.stages.pod_received));
+  }).length;
   document.getElementById('b-pay').textContent = s.filter(function(x){ return x.payment_status === 'Pending' && x.billing_status === 'Billed'; }).length;
 }
 
@@ -1238,47 +1290,91 @@ function renderDash() {
   var today = new Date().toISOString().slice(0,10);
 
   var kd = [
-    {key:'active', lbl:'Total Active', val:s.filter(function(x){return x.current_stage!=='file_closed';}).length, cls:'bl', sub:'in progress', hint:'Open shipments list'},
-    {key:'docs', lbl:'Pending Docs', val:s.filter(function(x){return hasPendingDocs(x);}).length, cls:'am', sub:'need docs', hint:'Open incomplete documentation'},
-    {key:'customs', lbl:'Customs Pending', val:s.filter(function(x){var i=SIDS.indexOf(x.current_stage);return i>=SIDS.indexOf('cargo_handed_over')&&i<SIDS.indexOf('customs_cleared');}).length, cls:'', sub:'awaiting clearance', hint:'Open customs view'},
-    {key:'delivery', lbl:'Intransit', val:s.filter(function(x){return isShipInTransit(x);}).length, cls:'te', sub:'cargo moving', hint:'Open intransit shipments'},
-    {key:'pod', lbl:'POD Pending', val:s.filter(function(x){return x.pod_status==='POD Pending'&&SIDS.indexOf(x.current_stage)>=SIDS.indexOf('delivered');}).length, cls:'am', sub:'awaiting proof', hint:'Open POD pending list'},
-    {key:'billing', lbl:'Billing Pending', val:s.filter(function(x){return x.billing_status==='Unbilled'&&SIDS.indexOf(x.current_stage)>=SIDS.indexOf('delivered');}).length, cls:'am', sub:'unbilled', hint:'Open pending billing list'},
-    {key:'payment', lbl:'Payment Pending', val:s.filter(function(x){return x.payment_status==='Pending'&&x.billing_status==='Billed';}).length, cls:'rd', sub:'awaiting payment', hint:'Open payment pending shipments'},
-    {key:'closed', lbl:'Closed', val:s.filter(function(x){return x.current_stage==='file_closed';}).length, cls:'gr', sub:'files closed', hint:'Open closed shipments'}
+    {key:'active', lbl:'Total Active', val:s.filter(function(x){return x.current_stage!=='file_closed';}).length, cls:'bl', sub:'in progress', ico:'🚢', hint:'Open shipments list'},
+    {key:'docs', lbl:'Pending Docs', val:s.filter(function(x){return hasPendingDocs(x);}).length, cls:'am', sub:'need docs', ico:'📄', hint:'Open incomplete documentation'},
+    {key:'customs', lbl:'Customs Pending', val:s.filter(function(x){var i=SIDS.indexOf(x.current_stage);return i>=SIDS.indexOf('cargo_handed_over')&&i<SIDS.indexOf('customs_cleared');}).length, cls:'', sub:'awaiting clearance', ico:'🏛', hint:'Open customs view'},
+    {key:'delivery', lbl:'In Transit', val:s.filter(function(x){return isShipInTransit(x);}).length, cls:'te', sub:'cargo moving', ico:'✈', hint:'Open intransit shipments'},
+    {key:'pod', lbl:'POD Pending', val:s.filter(function(x){return x.pod_status==='POD Pending'&&SIDS.indexOf(x.current_stage)>=SIDS.indexOf('delivered');}).length, cls:'am', sub:'awaiting proof', ico:'📋', hint:'Open POD pending list'},
+    {key:'billing', lbl:'Billing Pending', val:s.filter(function(x){
+        var logiAmt=+(x.cust_amount_inr)||+(x.billing_amount)||0; if(logiAmt>0) return false;
+        var stIdx=SIDS.indexOf(normalizeStageId(x.current_stage));
+        return stIdx>=SIDS.indexOf('delivered')||(x.pod_status==='Delivered'||x.pod_status==='POD Received')||(x.stages&&(x.stages.delivered||x.stages.pod_received));
+      }).length, cls:'am', sub:'unbilled', ico:'🧾', hint:'Open pending billing list'},
+    {key:'payment', lbl:'Payment Pending', val:s.filter(function(x){return x.payment_status==='Pending'&&x.billing_status==='Billed';}).length, cls:'rd', sub:'awaiting payment', ico:'💳', hint:'Open payment pending shipments'},
+    {key:'closed', lbl:'Closed', val:s.filter(function(x){return x.current_stage==='file_closed';}).length, cls:'gr', sub:'files closed', ico:'✅', hint:'Open closed shipments'}
   ];
 
-  document.getElementById('kpi1').innerHTML = kd.slice(0,4).map(function(k){
-    return '<div class="kpi '+k.cls+'" onclick="dashboardKpiClick(\''+k.key+'\')" title="'+k.hint+'"><div class="kpi-lbl">'+k.lbl+'</div><div class="kpi-val '+k.cls+'">'+k.val+'</div><div class="kpi-sub">'+k.sub+'</div></div>';
-  }).join('');
-  document.getElementById('kpi2').innerHTML = kd.slice(4).map(function(k){
-    return '<div class="kpi '+k.cls+'" onclick="dashboardKpiClick(\''+k.key+'\')" title="'+k.hint+'"><div class="kpi-lbl">'+k.lbl+'</div><div class="kpi-val '+k.cls+'">'+k.val+'</div><div class="kpi-sub">'+k.sub+'</div></div>';
-  }).join('');
+  var kpiHtml = function(k) {
+    return '<div class="kpi '+k.cls+'" onclick="dashboardKpiClick(\''+k.key+'\')" title="'+k.hint+'" style="cursor:pointer">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+        '<div class="kpi-lbl">'+k.lbl+'</div><span style="font-size:15px;opacity:.65">'+k.ico+'</span>' +
+      '</div>' +
+      '<div class="kpi-val '+k.cls+'" style="font-size:28px">'+k.val+'</div>' +
+      '<div class="kpi-sub">'+k.sub+'</div>' +
+    '</div>';
+  };
+  document.getElementById('kpi1').innerHTML = kd.slice(0,4).map(kpiHtml).join('');
+  document.getElementById('kpi2').innerHTML = kd.slice(4).map(kpiHtml).join('');
 
+  // ── Financial summary strip ──
+  var totalBilled = s.reduce(function(a,x){return a+(+(x.billing_amount)||+(x.cust_amount_inr)||0);},0);
+  var totalRcvd   = s.filter(function(x){return x.payment_status==='Received';}).reduce(function(a,x){return a+(+(x.billing_amount)||+(x.cust_amount_inr)||0);},0);
+  var totalVendor = s.reduce(function(a,x){return a+(+(x.vendor_cost)||0);},0);
+  var totalDuty   = s.reduce(function(a,x){return a+(+(x.duty_amount)||0);},0);
+  var totalProfit = totalBilled - totalVendor - totalDuty;
+  var finStrip = document.getElementById('dash-fin-strip');
+  if (finStrip) {
+    var fi = [
+      {lbl:'Total Revenue', val:'₹'+fmt(totalBilled), clr:'var(--blue-b)', ico:'📥'},
+      {lbl:'Collected', val:'₹'+fmt(totalRcvd), clr:'var(--green-b)', ico:'✓'},
+      {lbl:'Outstanding', val:'₹'+fmt(totalBilled-totalRcvd), clr:'var(--red-b)', ico:'⏳'},
+      {lbl:'Net Margin', val:'₹'+fmt(totalProfit), clr:(totalProfit>=0?'var(--green-b)':'var(--red-b)'), ico:'📊'}
+    ];
+    finStrip.innerHTML = fi.map(function(f){
+      return '<div style="background:linear-gradient(135deg,#fff 0%,var(--s2) 100%);border:1px solid var(--b1);border-radius:var(--r);padding:12px 16px;box-shadow:0 2px 8px rgba(16,36,63,.04)">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
+          '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3)">'+f.lbl+'</span>' +
+          '<span style="font-size:13px">'+f.ico+'</span>' +
+        '</div>' +
+        '<div class="mono" style="font-size:19px;font-weight:700;color:'+f.clr+'">'+f.val+'</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // ── Recent shipments ──
   var recent = s.slice(0,8);
-  document.getElementById('dash-recent').innerHTML = '<table><thead><tr><th>Job No.</th><th>Customer</th><th>Mode</th><th>Stage</th><th>ETD</th><th>Payment</th></tr></thead><tbody>' +
+  document.getElementById('dash-recent').innerHTML = '<table><thead><tr>' +
+    '<th>Job No.</th><th>Customer</th><th>Mode</th><th>Route</th><th>Stage</th><th>ETA</th><th>Billing</th><th>Payment</th>' +
+    '</tr></thead><tbody>' +
     (recent.length ? recent.map(function(x){
+      var etaOverdue = x.eta && x.eta < today && !isShipDelivered(x);
       return '<tr class="cr" onclick="openDet(\''+x.id+'\')">' +
         '<td><span class="mono" style="color:var(--green-b);font-weight:700">'+x.job_number+'</span></td>' +
-        '<td style="max-width:130px;overflow:hidden;text-overflow:ellipsis">'+x.customer_name+'</td>' +
+        '<td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;font-weight:600">'+x.customer_name+'</td>' +
         '<td>'+modeTag(x.mode)+'</td>' +
-        '<td style="font-size:11px;color:var(--t3)">'+shipStatusLabel(x)+'</td>' +
-        '<td class="mono" style="font-size:11px">'+(x.etd||'—')+'</td>' +
+        '<td style="font-size:11px;color:var(--t3)">'+(x.pol||'—')+' → '+(x.pod||'—')+'</td>' +
+        '<td style="font-size:11px;color:var(--t2)">'+shipStatusLabel(x)+'</td>' +
+        '<td class="mono" style="font-size:11px;'+(etaOverdue?'color:var(--red-b);font-weight:700':'')+'">'+(x.eta||'—')+(etaOverdue?' ⚠':'')+'</td>' +
+        '<td>'+bbadge(x.billing_status)+'</td>' +
         '<td>'+pbadge(x.payment_status)+'</td>' +
-        '</tr>';
-    }).join('') : '<tr><td colspan="6" class="t-empty">No shipments yet. Create your first shipment!</td></tr>') +
+      '</tr>';
+    }).join('') : '<tr><td colspan="8" class="t-empty">No shipments yet. Create your first shipment!</td></tr>') +
     '</tbody></table>';
 
-  var mc = {}; s.forEach(function(x){ var k=x.mode||'?'; mc[k]=(mc[k]||0)+1; });
-  var mm = Math.max.apply(null, Object.values(mc).concat([1]));
-  var mclr = {Air:'bl','Sea LCL':'te','Sea FCL':'te',Road:'am'};
+  // ── By Mode chart ──
+  var mc = {}; s.forEach(function(x){var k=x.mode||'?';mc[k]=(mc[k]||0)+1;});
+  var mm = Math.max.apply(null,Object.values(mc).concat([1]));
+  var mclr = {Air:'var(--blue)','Sea LCL':'var(--teal)','Sea FCL':'var(--teal)',Road:'var(--amber)'};
   document.getElementById('dash-mode').innerHTML = '<div class="bar-chart">'+
-    Object.entries(mc).map(function(e){
-      var m=e[0],c=e[1];
-      return '<div class="bc-wrap"><div class="bc-val">'+c+'</div><div class="bc-bar '+(mclr[m]||'gr')+'" style="height:'+Math.max(5,c/mm*78)+'px"></div><div class="bc-lbl">'+m+'</div></div>';
+    Object.entries(mc).sort(function(a,b){return b[1]-a[1];}).map(function(e){
+      var clr=mclr[e[0]]||'var(--green)';
+      return '<div class="bc-wrap"><div class="bc-val" style="font-weight:700">'+e[1]+'</div>' +
+        '<div class="bc-bar" style="height:'+Math.max(6,e[1]/mm*72)+'px;background:linear-gradient(180deg,'+clr+','+clr+'99);border-radius:4px 4px 0 0"></div>' +
+        '<div class="bc-lbl" style="font-size:9px;font-weight:600">'+e[0]+'</div></div>';
     }).join('')+'</div>';
 
-  var fu = s.filter(function(x){ return x.target_date===today; });
+  // ── Follow-up ──
+  var fu = s.filter(function(x){return x.target_date===today;});
   document.getElementById('dash-followup').innerHTML = fu.length ?
     fu.slice(0,5).map(function(x){
       return '<div class="act-item cr" onclick="openDet(\''+x.id+'\')">' +
@@ -1287,27 +1383,97 @@ function renderDash() {
         '<div class="act-time">'+(x.next_action||'Follow Up')+' · Today</div></div></div>';
     }).join('') : '<div class="t-empty" style="padding:1.2rem">No follow-ups today 🎉</div>';
 
-  var ov = s.filter(function(x){ return x.target_date && x.target_date < today && x.current_stage !== 'file_closed'; });
+  // ── Overdue ──
+  var ov = s.filter(function(x){return x.target_date&&x.target_date<today&&x.current_stage!=='file_closed';});
   document.getElementById('dash-overdue').innerHTML = ov.length ?
     ov.slice(0,5).map(function(x){
+      var days=Math.round((new Date(today)-new Date(x.target_date))/(1000*86400));
       return '<div class="act-item cr" onclick="openDet(\''+x.id+'\')">' +
         '<div class="act-dot" style="background:var(--red)"></div>' +
         '<div class="act-body"><div class="act-text"><strong>'+x.job_number+'</strong> — '+x.customer_name+'</div>' +
-        '<div class="act-time" style="color:var(--red-b)">Target: '+x.target_date+' · '+(x.pending_with||'Unassigned')+'</div></div></div>';
+        '<div class="act-time" style="color:var(--red-b)">'+days+'d overdue · '+(x.pending_with||'Unassigned')+'</div></div></div>';
     }).join('') : '<div class="t-empty" style="padding:1.2rem">No overdue shipments ✓</div>';
 
-  var sc = {}; s.forEach(function(x){ var l=slbl(x.current_stage); sc[l]=(sc[l]||0)+1; });
-  var sm = Math.max.apply(null, Object.values(sc).concat([1]));
-  var topS = Object.entries(sc).sort(function(a,b){return b[1]-a[1];}).slice(0,6);
-  document.getElementById('dash-stage').innerHTML = '<div class="bar-chart">'+
-    topS.map(function(e,i){
-      return '<div class="bc-wrap"><div class="bc-val">'+e[1]+'</div><div class="bc-bar gr" style="height:'+Math.max(4,e[1]/sm*78)+'px;opacity:'+(1-i*.1)+'"></div><div class="bc-lbl" style="font-size:8px;max-width:45px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+e[0]+'">'+e[0]+'</div></div>';
-    }).join('')+'</div>';
+  // ── Stage distribution (horizontal bars) ──
+  var sc = {}; s.forEach(function(x){var l=slbl(x.current_stage);sc[l]=(sc[l]||0)+1;});
+  var sm = Math.max.apply(null,Object.values(sc).concat([1]));
+  var topS = Object.entries(sc).sort(function(a,b){return b[1]-a[1];}).slice(0,7);
+  document.getElementById('dash-stage').innerHTML = topS.map(function(e){
+    var bw=Math.max(4,Math.round(e[1]/sm*100));
+    return '<div style="margin-bottom:7px">' +
+      '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px">' +
+        '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px">'+e[0]+'</span>' +
+        '<span class="mono" style="font-weight:700;flex-shrink:0">'+e[1]+'</span>' +
+      '</div>' +
+      '<div style="height:7px;background:var(--s2);border-radius:4px;overflow:hidden">' +
+        '<div style="height:100%;width:'+bw+'%;background:linear-gradient(90deg,var(--blue),var(--teal));border-radius:4px"></div>' +
+      '</div></div>';
+  }).join('');
 
+  // ── Recent activity ──
   document.getElementById('dash-activity').innerHTML = DB.acts.slice(0,10).map(function(a){
     return '<div class="act-item"><div class="act-dot '+(a.type==='billing'?'bl':a.type==='payment'?'am':'')+'"></div>' +
       '<div class="act-body"><div class="act-text">'+a.text+'</div><div class="act-time">'+ago(a.created_at)+'</div></div></div>';
   }).join('') || '<div class="t-empty" style="padding:1rem">No activity yet</div>';
+
+  // ── Top customers by revenue ──
+  var custRev = {};
+  s.forEach(function(x){
+    var k=x.customer_name||'Unknown';
+    if(!custRev[k]) custRev[k]={rev:0,cnt:0,paid:0};
+    custRev[k].rev+=(+(x.billing_amount)||+(x.cust_amount_inr)||0);
+    custRev[k].cnt+=1;
+    if(x.payment_status==='Received') custRev[k].paid+=(+(x.billing_amount)||+(x.cust_amount_inr)||0);
+  });
+  var custArr=Object.entries(custRev).sort(function(a,b){return b[1].rev-a[1].rev;}).slice(0,5);
+  var maxRev=custArr.length?custArr[0][1].rev:1;
+  var custEl=document.getElementById('dash-top-cust');
+  if(custEl){
+    custEl.innerHTML = custArr.length ? custArr.map(function(e){
+      var bw=Math.max(4,Math.round(e[1].rev/maxRev*100));
+      var payPct=e[1].rev>0?Math.round(e[1].paid/e[1].rev*100):0;
+      return '<div style="margin-bottom:10px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">' +
+          '<span style="font-weight:600;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">'+e[0]+'</span>' +
+          '<div style="text-align:right;flex-shrink:0">' +
+            '<span class="mono" style="font-size:11px;color:var(--green-b)">₹'+fmt(e[1].rev)+'</span>' +
+            '<span style="font-size:10px;color:var(--t3);margin-left:5px">'+e[1].cnt+' ship.</span>' +
+          '</div>' +
+        '</div>' +
+        '<div style="position:relative;height:8px;background:var(--s2);border-radius:4px;overflow:hidden">' +
+          '<div style="height:100%;width:'+bw+'%;background:linear-gradient(90deg,var(--green),#4ade80);border-radius:4px"></div>' +
+          (payPct>0?'<div style="position:absolute;top:0;left:0;height:100%;width:'+Math.round(bw*payPct/100)+'%;background:var(--green-b);border-radius:4px;opacity:.5"></div>':'') +
+        '</div>' +
+        '<div style="font-size:9px;color:var(--t3);margin-top:2px">'+payPct+'% collected</div>' +
+      '</div>';
+    }).join('') : '<div class="t-empty" style="padding:1rem">No revenue data yet</div>';
+  }
+
+  // ── Payment health donut ──
+  var phEl=document.getElementById('dash-pay-health');
+  if(phEl){
+    var billed=s.filter(function(x){return x.billing_status==='Billed';});
+    var billedAmt=billed.reduce(function(a,x){return a+(+(x.billing_amount)||0);},0);
+    var rcvdAmt=billed.filter(function(x){return x.payment_status==='Received';}).reduce(function(a,x){return a+(+(x.billing_amount)||0);},0);
+    var pct=billedAmt>0?Math.round(rcvdAmt/billedAmt*100):0;
+    var r=40,cx=50,cy=50,sw=10,circ=2*Math.PI*r;
+    var dash=(pct/100*circ)+' '+circ;
+    phEl.innerHTML =
+      '<div style="display:flex;align-items:center;gap:20px">' +
+      '<svg width="100" height="100" viewBox="0 0 100 100" style="flex-shrink:0">' +
+        '<circle cx="50" cy="50" r="40" fill="none" stroke="var(--red-l)" stroke-width="10"/>' +
+        '<circle cx="50" cy="50" r="40" fill="none" stroke="var(--green)" stroke-width="10" stroke-dasharray="'+dash+'" stroke-dashoffset="'+(circ*.25)+'" stroke-linecap="round" transform="rotate(-90 50 50)"/>' +
+        '<text x="50" y="55" text-anchor="middle" font-size="16" font-weight="700" font-family="JetBrains Mono,monospace" fill="var(--t1)">'+pct+'%</text>' +
+      '</svg>' +
+      '<div style="flex:1">' +
+        '<div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3)">Total Billed</div><div class="mono" style="font-size:14px;font-weight:700">₹'+fmt(billedAmt)+'</div></div>' +
+        '<div style="display:flex;gap:14px">' +
+          '<div><div style="display:flex;align-items:center;gap:4px;margin-bottom:2px"><span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block"></span><span style="font-size:10px;color:var(--t3)">Received</span></div><div class="mono" style="font-size:12px;font-weight:700;color:var(--green-b)">₹'+fmt(rcvdAmt)+'</div></div>' +
+          '<div><div style="display:flex;align-items:center;gap:4px;margin-bottom:2px"><span style="width:8px;height:8px;border-radius:50%;background:var(--red-l);border:1.5px solid var(--red);display:inline-block"></span><span style="font-size:10px;color:var(--t3)">Outstanding</span></div><div class="mono" style="font-size:12px;font-weight:700;color:var(--red-b)">₹'+fmt(billedAmt-rcvdAmt)+'</div></div>' +
+        '</div>' +
+        '<div style="margin-top:8px;font-size:11px;color:var(--t2)">'+billed.length+' billed · '+billed.filter(function(x){return x.payment_status==='Received';}).length+' paid · '+billed.filter(function(x){return x.payment_status!=='Received';}).length+' pending</div>' +
+      '</div></div>';
+  }
 }
 
 // ── SHIPMENTS TABLE ───────────────────────────────────────
@@ -1453,9 +1619,13 @@ function dashboardKpiClick(key) {
   }
   if (key === 'billing') {
     id = document.getElementById('billf-q'); if (id) id.value = '';
-    id = document.getElementById('billf-st'); if (id) id.value = 'Pending';
+    id = document.getElementById('billf-st'); if (id) id.value = 'delivered-unbilled';
+    id = document.getElementById('billf-cust'); if (id) id.value = '';
+    id = document.getElementById('billf-mode'); if (id) id.value = '';
+    id = document.getElementById('billf-ship-status'); if (id) id.value = '';
     nav('billing');
-    billTab('recv', document.getElementById('bill-tab-recv'));
+    billTab('main', document.getElementById('bill-tab-main'));
+    renderBillMain();
     return;
   }
   if (key === 'payment') {
@@ -1503,10 +1673,11 @@ function openDet(id) {
       '</div>' +
       '<div class="det-meta">' +
         dm('Invoice No.', s.invoice_number) +
-        dm('AWB / HAWB', s.mawb_hawb||s.final_awb||s.awb, true) +
-        dmD('ETD', s.etd) + dmD('ETA', s.eta) +
-        dmD('Actual Departure', s.actual_departure) +
-        dmD('Actual Arrival', s.actual_arrival) +
+        dmEdit('AWB / HAWB', s.mawb_hawb, s.id, 'mawb_hawb', true) +
+        dmEditDate('ETD', s.etd, s.id, 'etd') +
+        dmEditDate('ETA', s.eta, s.id, 'eta') +
+        dmEditDate('Actual Departure', s.actual_departure, s.id, 'actual_departure') +
+        dmEditDate('Actual Arrival', s.actual_arrival, s.id, 'actual_arrival') +
         dm('Shipper', s.shipper_name) + dm('Consignee', s.consignee_name) +
         dm('CHA', s.cha_name) + dm('Vendor', s.vendor_name) +
         dm('MBL / HBL', s.mbl_hbl, true) +
@@ -1533,6 +1704,48 @@ function dmD(lbl, val) {
     display = d ? fmtD(d) : fmtD(val);
   }
   return '<div><div class="dm-lbl">'+lbl+'</div><div class="dm-val mo">'+display+'</div></div>';
+}
+// Inline-editable text field in detail header
+function dmEdit(lbl, val, sid, field, mo) {
+  var id = 'dmi_'+field+'_'+sid;
+  return '<div>' +
+    '<div class="dm-lbl">'+lbl+'</div>' +
+    '<div style="display:flex;align-items:center;gap:4px">' +
+      '<input id="'+id+'" type="text" value="'+esc(val||'')+'" placeholder="— click to enter" ' +
+        'style="font-family:'+(mo?'\'JetBrains Mono\',monospace':'inherit')+';font-size:12px;font-weight:600;color:var(--t1);background:transparent;border:none;border-bottom:1.5px dashed var(--b2);outline:none;width:100%;min-width:80px;padding:1px 2px;transition:border .12s" ' +
+        'onfocus="this.style.borderBottomColor=\'var(--blue)\'" ' +
+        'onblur="this.style.borderBottomColor=\'var(--b2)\'" ' +
+        'onkeydown="if(event.key===\'Enter\')saveDetField(\''+sid+'\',\''+field+'\',document.getElementById(\''+id+'\').value)">' +
+      '<button onclick="saveDetField(\''+sid+'\',\''+field+'\',document.getElementById(\''+id+'\').value)" ' +
+        'style="background:none;border:none;cursor:pointer;color:var(--green-b);font-size:12px;padding:1px 3px;opacity:.5" title="Save">✓</button>' +
+    '</div>' +
+  '</div>';
+}
+// Inline-editable date field in detail header
+function dmEditDate(lbl, val, sid, field) {
+  var id = 'dmi_'+field+'_'+sid;
+  var normVal = val ? (normDate(val)||val) : '';
+  return '<div>' +
+    '<div class="dm-lbl">'+lbl+'</div>' +
+    '<div style="display:flex;align-items:center;gap:4px">' +
+      '<input id="'+id+'" type="date" value="'+esc(normVal)+'" ' +
+        'style="font-family:\'JetBrains Mono\',monospace;font-size:11px;font-weight:600;color:var(--t1);background:transparent;border:none;border-bottom:1.5px dashed var(--b2);outline:none;padding:1px 2px;max-width:120px;transition:border .12s" ' +
+        'onfocus="this.style.borderBottomColor=\'var(--blue)\'" ' +
+        'onblur="saveDetField(\''+sid+'\',\''+field+'\',this.value);this.style.borderBottomColor=\'var(--b2)\'" ' +
+        'onchange="saveDetField(\''+sid+'\',\''+field+'\',this.value)">' +
+    '</div>' +
+  '</div>';
+}
+async function saveDetField(sid, field, value) {
+  var s = DB.ships.find(function(x){ return x.id===sid; });
+  if (!s) return;
+  if (s[field] === value) return; // no change
+  s[field] = value || null;
+  try {
+    await dbU('shipments', s);
+    toast(field.replace(/_/g,' ')+' saved ✓','ok');
+    renderDash(); updateBadges();
+  } catch(e) { toast('Error: '+e.message,'err'); }
 }
 
 function renderSTL(s) {
@@ -2388,129 +2601,218 @@ function billTab(t, el) {
   else renderBillMain();
   setTimeout(adjustVisibleTableHeights, 0);
 }
+function clearBillFilters() {
+  ['billf-q','billf-st','billf-cust','billf-mode','billf-ship-status'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+  renderBillMain();
+}
+function populateBillCustomerFilter() {
+  var sel = document.getElementById('billf-cust');
+  if (!sel) return;
+  var custs = Array.from(new Set(DB.ships.map(function(s){return s.customer_name;}))).sort();
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">All Customers</option>' +
+    custs.map(function(c){ return '<option'+(c===cur?' selected':'')+'>'+c+'</option>'; }).join('');
+}
+function getShipmentStatusForBilling(s) {
+  // Returns a display label + category for the shipment's delivery state
+  var stages = s.stages || {};
+  if (s.pod_status === 'POD Received' || stages.pod_received) return {lbl:'POD Received', cat:'pod-received', badge:'b-gr'};
+  if (s.pod_status === 'Delivered' || stages.delivered) return {lbl:'Delivered', cat:'delivered', badge:'b-bl'};
+  if (stages.actual_arrival || stages.arrived || s.actual_arrival) return {lbl:'Arrived', cat:'in-transit', badge:'b-te'};
+  if (stages.actual_departure || stages.departed || s.actual_departure) return {lbl:'In Transit', cat:'in-transit', badge:'b-am'};
+  return {lbl:'Pre-Shipment', cat:'in-transit', badge:'b-gy'};
+}
 function renderBillMain() {
   var q = (document.getElementById('billf-q')||{}).value || '';
   q = q.toLowerCase();
-  var st = (document.getElementById('billf-st')||{}).value || '';
+  var st       = (document.getElementById('billf-st')||{}).value || '';
+  var custF    = (document.getElementById('billf-cust')||{}).value || '';
+  var modeF    = (document.getElementById('billf-mode')||{}).value || '';
+  var shipStF  = (document.getElementById('billf-ship-status')||{}).value || '';
   var el = document.getElementById('bill-main-t');
   if (!el) return;
+
+  populateBillCustomerFilter();
 
   var data = DB.ships.filter(function(s) {
     if (q && (s.job_number+' '+s.customer_name+' '+(s.invoice_number||'')+' '+(s.cust_invoice_no||'')+' '+(s.vendor_name||'')).toLowerCase().indexOf(q)<0) return false;
     var logiAmt = +(s.cust_amount_inr)||+(s.billing_amount)||0;
     var vendorAmt = +(s.vendor_cost)||0;
-    if (st==='logi-pending'  && s.payment_status==='Received') return false;
-    if (st==='logi-pending'  && s.billing_status!=='Billed') return false;
-    if (st==='logi-received' && s.payment_status!=='Received') return false;
-    if (st==='vendor-unpaid' && !(vendorAmt>0 && s.vendor_payment_status!=='Paid')) return false;
-    if (st==='vendor-paid'   && s.vendor_payment_status!=='Paid') return false;
-    if (st==='no-logi'       && logiAmt>0) return false;
+    if (custF && s.customer_name !== custF) return false;
+    if (modeF && s.mode !== modeF) return false;
+    if (st==='logi-pending'       && (s.payment_status==='Received' || s.billing_status!=='Billed')) return false;
+    if (st==='logi-received'      && s.payment_status!=='Received') return false;
+    if (st==='vendor-unpaid'      && !(vendorAmt>0 && s.vendor_payment_status!=='Paid')) return false;
+    if (st==='vendor-paid'        && s.vendor_payment_status!=='Paid') return false;
+    if (st==='no-logi'            && logiAmt>0) return false;
+    if (st==='delivered-unbilled') {
+      var sst = getShipmentStatusForBilling(s);
+      if (sst.cat!=='delivered' && sst.cat!=='pod-received') return false;
+      if (logiAmt>0) return false;
+    }
+    if (shipStF) {
+      var sst = getShipmentStatusForBilling(s);
+      if (sst.cat !== shipStF) return false;
+    }
     return true;
   });
 
   document.getElementById('bill-main-count').textContent = data.length + ' shipments';
 
   // Summary totals
-  var totalLogi   = data.reduce(function(a,s){ return a+(+(s.cust_amount_inr)||+(s.billing_amount)||0); },0);
+  var totalLogi    = data.reduce(function(a,s){ return a+(+(s.cust_amount_inr)||+(s.billing_amount)||0); },0);
   var receivedLogi = data.filter(function(s){return s.payment_status==='Received';}).reduce(function(a,s){ return a+(+(s.cust_amount_inr)||+(s.billing_amount)||0); },0);
-  var totalVendor = data.reduce(function(a,s){ return a+(+(s.vendor_cost)||0); },0);
-  var paidVendor  = data.filter(function(s){return s.vendor_payment_status==='Paid';}).reduce(function(a,s){ return a+(+(s.vendor_cost)||0); },0);
+  var totalVendor  = data.reduce(function(a,s){ return a+(+(s.vendor_cost)||0); },0);
+  var paidVendor   = data.filter(function(s){return s.vendor_payment_status==='Paid';}).reduce(function(a,s){ return a+(+(s.vendor_cost)||0); },0);
 
   el.innerHTML =
     '<thead>' +
     '<tr style="background:var(--s2)">' +
-      '<td colspan="11" style="padding:10px 14px">' +
-        '<div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">' +
-          '<span style="font-size:12px"><span style="color:var(--t3)">Logistics Total: </span><span class="mono" style="font-weight:700;color:var(--green-b)">₹'+fmt(totalLogi)+'</span> <span style="font-size:11px;color:var(--t3)">· Received: ₹'+fmt(receivedLogi)+' · Pending: ₹'+fmt(totalLogi-receivedLogi)+'</span></span>' +
-          '<span style="font-size:12px"><span style="color:var(--t3)">Vendor Total: </span><span class="mono" style="font-weight:700;color:var(--amber-b)">₹'+fmt(totalVendor)+'</span> <span style="font-size:11px;color:var(--t3)">· Paid: ₹'+fmt(paidVendor)+' · Unpaid: ₹'+fmt(totalVendor-paidVendor)+'</span></span>' +
+      '<td colspan="10" style="padding:8px 12px">' +
+        '<div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">' +
+          '<span style="font-size:11px"><span style="color:var(--t3)">Logi: </span><span class="mono" style="font-weight:700;color:var(--green-b)">₹'+fmt(totalLogi)+'</span><span style="font-size:10px;color:var(--t3)"> · Rcvd ₹'+fmt(receivedLogi)+' · Pending ₹'+fmt(totalLogi-receivedLogi)+'</span></span>' +
+          '<span style="font-size:11px"><span style="color:var(--t3)">Vendor: </span><span class="mono" style="font-weight:700;color:var(--amber-b)">₹'+fmt(totalVendor)+'</span><span style="font-size:10px;color:var(--t3)"> · Paid ₹'+fmt(paidVendor)+' · Unpaid ₹'+fmt(totalVendor-paidVendor)+'</span></span>' +
         '</div>' +
       '</td>' +
     '</tr>' +
     '<tr>' +
-      '<th>Job No.</th>' +
-      '<th>Customer</th>' +
-      '<th>Commercial Invoice</th>' +
-      '<th>Logistics Invoice <span style="font-weight:400;color:var(--t3)">(you → customer)</span></th>' +
-      '<th>Currency</th>' +
-      '<th>Invoice Value</th>' +
-      '<th>Received / Pending</th>' +
-      '<th>Vendor Invoice <span style="font-weight:400;color:var(--t3)">(vendor → you)</span></th>' +
-      '<th>Vendor Amount</th>' +
-      '<th>Paid / Unpaid</th>' +
+      '<th style="min-width:100px">Job No.</th>' +
+      '<th style="min-width:110px">Customer</th>' +
+      '<th style="min-width:80px">Status</th>' +
+      '<th style="min-width:110px">Ship. Status</th>' +
+      '<th style="min-width:130px">Invoices <span style="font-weight:400;font-size:9px;color:var(--t3)">(you → cust)</span></th>' +
+      '<th style="min-width:110px">Invoice Value</th>' +
+      '<th style="min-width:100px">Logi Status</th>' +
+      '<th style="min-width:110px">Vendor</th>' +
+      '<th style="min-width:90px">Vendor Amt</th>' +
       '<th></th>' +
     '</tr>' +
     '</thead>' +
     '<tbody>' +
     (data.length ? data.map(function(s) {
-      var logiInv  = s.cust_invoice_no || s.invoice_number || '';
-      var cur      = s.cust_currency || s.invoice_currency || 'INR';
-      var origAmt  = +(s.cust_amount_orig)||+(s.invoice_value)||0;
       var logiAmt  = +(s.cust_amount_inr)||+(s.billing_amount)||0;
       var vendorAmt = +(s.vendor_cost)||0;
       var dutyAmt  = +(s.duty_amount)||0;
 
       // Logistics invoice status
       var logiStatus;
-      if (!logiAmt) {
-        logiStatus = '<span class="badge b-gy">Not raised</span>';
-      } else if (s.payment_status === 'Received') {
-        logiStatus = '<span class="badge b-gr">✓ Received</span>';
-      } else {
-        logiStatus = '<span class="badge b-rd">Pending</span>';
-      }
+      if (!logiAmt) { logiStatus = '<span class="badge b-gy" style="font-size:10px">Not raised</span>'; }
+      else if (s.payment_status === 'Received') { logiStatus = '<span class="badge b-gr" style="font-size:10px">✓ Received</span>'; }
+      else { logiStatus = '<span class="badge b-rd" style="font-size:10px">Pending</span>'; }
 
       // Vendor invoice status
       var vendorPaid = s.vendor_payment_status === 'Paid';
       var vendorStatus;
-      if (!vendorAmt && !dutyAmt) {
-        vendorStatus = '<span class="badge b-gy">No invoice</span>';
-      } else if (vendorPaid) {
-        vendorStatus = '<span class="badge b-gr">✓ Paid</span>';
-      } else {
-        vendorStatus = '<span class="badge b-am">Unpaid</span>';
-      }
+      if (!vendorAmt && !dutyAmt) { vendorStatus = '<span class="badge b-gy" style="font-size:10px">No inv.</span>'; }
+      else if (vendorPaid) { vendorStatus = '<span class="badge b-gr" style="font-size:10px">✓ Paid</span>'; }
+      else { vendorStatus = '<span class="badge b-am" style="font-size:10px">Unpaid</span>'; }
 
-      // Warn row: vendor has cost but logistics not raised
-      var rowWarn = (vendorAmt > 0 && !logiAmt) ? ' style="background:#fffbeb"' : '';
+      // Shipment status
+      var shipSt = getShipmentStatusForBilling(s);
 
-      // Currency display
-      var curDisplay = cur !== 'INR'
-        ? '<span class="cur-badge cur-'+cur.toLowerCase()+'">'+cur+'</span>'
-        : '<span class="cur-badge cur-inr">INR</span>';
+      // Row highlight logic
+      var isDeliveredUnbilled = (shipSt.cat === 'delivered' || shipSt.cat === 'pod-received') && !logiAmt;
+      var isVendorWarn = (vendorAmt > 0 && !logiAmt) && !isDeliveredUnbilled;
+      // Use td-level bg so hover doesn't override
+      var tdBg = isDeliveredUnbilled ? 'background:#ffd7d7' : (isVendorWarn ? 'background:#fffbeb' : '');
+      var tdStyle = tdBg ? ' style="'+tdBg+'"' : '';
+
+      // Invoice display (original style)
+      var logiInv = s.cust_invoice_no || s.invoice_number || '';
+      var cur = s.cust_currency || s.invoice_currency || 'INR';
+      var origAmt = +(s.cust_amount_orig)||+(s.invoice_value)||0;
 
       var invValueDisplay = '';
       if (origAmt > 0 && cur !== 'INR') {
-        invValueDisplay = '<span class="mono">'+fmt(origAmt)+'</span>';
+        invValueDisplay = '<span class="mono" style="font-size:12px">'+fmt(origAmt)+'</span>';
         if (logiAmt > 0) invValueDisplay += '<br><span style="font-size:10px;color:var(--t3)">= ₹'+fmt(logiAmt)+'</span>';
       } else if (logiAmt > 0) {
-        invValueDisplay = '<span class="mono">₹'+fmt(logiAmt)+'</span>';
-      } else {
-        invValueDisplay = '<span style="color:var(--t3)">—</span>';
-      }
+        invValueDisplay = '<span class="mono" style="font-size:12px">₹'+fmt(logiAmt)+'</span>';
+      } else { invValueDisplay = '<span style="color:var(--t3)">—</span>'; }
+
+      // Billing status badge
+      var billBadge = s.billing_status==='Billed'
+        ? '<span class="badge b-bl" style="font-size:10px">Billed</span>'
+        : '<span class="badge b-gy" style="font-size:10px">Unbilled</span>';
 
       var vendorAmtDisplay = (vendorAmt > 0 || dutyAmt > 0)
-        ? '<span class="mono" style="color:var(--amber-b)">₹'+fmt(vendorAmt)+'</span>' +
-          (dutyAmt > 0 ? '<br><span style="font-size:10px;color:var(--t3)">+ Duty ₹'+fmt(dutyAmt)+'</span>' : '')
+        ? '<span class="mono" style="font-size:12px;color:var(--amber-b)">₹'+fmt(vendorAmt)+'</span>' +
+          (dutyAmt > 0 ? '<br><span style="font-size:10px;color:var(--t3)">+D ₹'+fmt(dutyAmt)+'</span>' : '')
         : '<span style="color:var(--t3)">—</span>';
 
-      return '<tr class="cr"'+rowWarn+' onclick="openBillDet(\''+s.id+'\')">' +
-        '<td class="mono" style="color:var(--green-b);font-weight:700;font-size:12px">'+s.job_number+'</td>' +
-        '<td style="font-weight:600;font-size:12px">'+s.customer_name+'</td>' +
-        '<td class="mono" style="font-size:11px;color:var(--t2)">'+(s.invoice_number||'<span style="color:var(--t3)">—</span>')+'</td>' +
-        '<td class="mono" style="font-size:11px;font-weight:600">'+(logiInv||'<span style="font-size:11px;color:var(--t3);font-family:inherit;font-weight:400">Not raised</span>')+'</td>' +
-        '<td>'+curDisplay+'</td>' +
-        '<td>'+invValueDisplay+'</td>' +
-        '<td>'+logiStatus+'</td>' +
-        '<td style="font-size:11px;color:var(--t2)">'+(s.vendor_name||'<span style="color:var(--t3)">—</span>')+'<br><span class="mono" style="font-size:10px;color:var(--t3)">'+(s.vendor_invoice_no||'')+'</span></td>' +
-        '<td>'+vendorAmtDisplay+'</td>' +
-        '<td>'+vendorStatus+'</td>' +
-        '<td onclick="event.stopPropagation()" style="white-space:nowrap">' +
+      // Warn icon for delivered+unbilled — REMOVED per user request
+      var warnIcon = '';
+
+      // Build row — each td gets the background style so hover can't override
+      return '<tr class="cr" onclick="openBillDet(\''+s.id+'\')">' +
+        '<td'+tdStyle+'><div class="mono" style="color:var(--green-b);font-weight:700;font-size:11px">'+s.job_number+warnIcon+'</div><div style="font-size:10px;color:var(--t3)">'+(s.invoice_number||'')+'</div></td>' +
+        '<td'+tdStyle+' style="'+(tdBg?tdBg+';':'')+' font-weight:600;font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis">'+s.customer_name+'</td>' +
+        '<td'+tdStyle+'>'+billBadge+'</td>' +
+        '<td'+tdStyle+'><span class="badge '+shipSt.badge+'" style="font-size:10px">'+shipSt.lbl+'</span></td>' +
+        '<td'+tdStyle+' class="mono" style="'+(tdBg?tdBg+';':'')+' font-size:11px;font-weight:600">'+(logiInv||'<span style="font-size:11px;color:var(--t3);font-family:inherit;font-weight:400">Not raised</span>')+'</td>' +
+        '<td'+tdStyle+'>'+invValueDisplay+'</td>' +
+        '<td'+tdStyle+'>'+logiStatus+'</td>' +
+        '<td'+tdStyle+' style="'+(tdBg?tdBg+';':'')+' font-size:11px;color:var(--t2);max-width:120px;overflow:hidden;text-overflow:ellipsis">'+(s.vendor_name||'<span style="color:var(--t3)">—</span>')+'<br>'+vendorStatus+'</td>' +
+        '<td'+tdStyle+'>'+vendorAmtDisplay+'</td>' +
+        '<td'+tdStyle+' onclick="event.stopPropagation()" style="'+(tdBg?tdBg+';':'')+' white-space:nowrap">' +
           '<button class="btn btn-xs btn-bl" style="margin-bottom:3px" onclick="openBillModal(\''+s.id+'\')">✏ Edit</button><br>' +
           (!vendorPaid && (vendorAmt>0||dutyAmt>0) ? '<button class="btn btn-xs" onclick="markVendorPaid(\''+s.id+'\')">Mark V.Paid</button>' : '') +
         '</td>' +
-        '</tr>';
-    }).join('') : '<tr><td colspan="11" class="t-empty">No shipments found</td></tr>') +
+      '</tr>';
+    }).join('') : '<tr><td colspan="10" class="t-empty">No shipments found</td></tr>') +
     '</tbody>';
+}
+// Extra invoices modal
+function openAddInvoice(sid) {
+  var s = DB.ships.find(function(x){ return x.id===sid; });
+  if (!s) return;
+  var extras = s.extra_invoices ? JSON.parse(s.extra_invoices) : [];
+  var html = '<div style="margin-bottom:12px;font-size:12px;color:var(--t2)">Add an additional logistics invoice for <strong>'+s.job_number+'</strong></div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">' +
+      '<div class="fgi"><label class="fl">Invoice No.</label><input class="fi" id="ai_no" placeholder="Invoice number"></div>' +
+      '<div class="fgi"><label class="fl">Currency</label><select class="fi" id="ai_cur"><option>INR</option><option>USD</option><option>EUR</option><option>GBP</option><option>AED</option></select></div>' +
+      '<div class="fgi"><label class="fl">Amount</label><input class="fi" type="number" id="ai_amt" placeholder="Amount"></div>' +
+    '</div>' +
+    (extras.length ? '<div style="margin-top:10px;font-size:11px;font-weight:600;color:var(--t3);margin-bottom:6px">EXISTING EXTRA INVOICES</div>' +
+      extras.map(function(inv,i){ return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--s2);border-radius:4px;margin-bottom:4px;font-size:12px">' +
+        '<span class="mono">'+inv.no+'</span><span class="badge b-bl" style="font-size:10px">'+inv.cur+'</span><span class="mono" style="color:var(--green-b)">'+fmt(inv.logiAmt)+'</span>' +
+        '<button class="btn btn-xs btn-rd" style="margin-left:auto" onclick="removeExtraInv(\''+sid+'\','+i+')">✕</button></div>';}).join('')
+    : '') +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">' +
+      '<button class="btn" onclick="closeMo(\'mo-extra-inv\')">Cancel</button>' +
+      '<button class="btn btn-p" onclick="saveExtraInv(\''+sid+'\')">Add Invoice</button></div>';
+  var mo = document.getElementById('mo-extra-inv');
+  if (!mo) {
+    mo = document.createElement('div');
+    mo.className = 'mo'; mo.id = 'mo-extra-inv';
+    mo.innerHTML = '<div class="mo-box sm"><div class="mo-head"><div class="mo-title">Add Invoice to Job</div><button class="mo-x" onclick="closeMo(\'mo-extra-inv\')">×</button></div><div class="mo-body" id="extra-inv-body"></div></div>';
+    document.body.appendChild(mo);
+  }
+  document.getElementById('extra-inv-body').innerHTML = html;
+  openMo('mo-extra-inv');
+}
+function openExtraInvoices(sid) { openAddInvoice(sid); }
+async function removeExtraInv(sid, idx) {
+  var s = DB.ships.find(function(x){ return x.id===sid; });
+  if (!s) return;
+  var extras = s.extra_invoices ? JSON.parse(s.extra_invoices) : [];
+  extras.splice(idx, 1);
+  s.extra_invoices = JSON.stringify(extras);
+  try { await dbU('shipments', s); toast('Removed ✓','ok'); renderBillMain(); openAddInvoice(sid); } catch(e){ toast('Error','err'); }
+}
+async function saveExtraInv(sid) {
+  var s = DB.ships.find(function(x){ return x.id===sid; });
+  if (!s) return;
+  var no  = (document.getElementById('ai_no')||{}).value.trim();
+  var cur = (document.getElementById('ai_cur')||{}).value||'INR';
+  var amt = +((document.getElementById('ai_amt')||{}).value)||0;
+  if (!no) { toast('Enter invoice number','err'); return; }
+  var extras = s.extra_invoices ? JSON.parse(s.extra_invoices) : [];
+  extras.push({ no:no, cur:cur, logiAmt:amt, origAmt:amt, payStatus:'Pending' });
+  s.extra_invoices = JSON.stringify(extras);
+  try { await dbU('shipments', s); toast('Invoice added ✓','ok'); renderBillMain(); closeMo('mo-extra-inv'); } catch(e){ toast('Error','err'); }
 }
 async function markVendorPaid(sid) {
   var s = DB.ships.find(function(x){ return x.id===sid; });
@@ -2777,12 +3079,94 @@ async function saveBill() {
 
 // ── PAYMENTS ──────────────────────────────────────────────
 function renderPays() {
-  var tot = DB.ships.filter(function(s){ return s.billing_status==='Billed'; }).reduce(function(a,s){ return a+(+(s.billing_amount)||0); }, 0);
-  var paid = DB.ships.filter(function(s){ return s.payment_status==='Received'; }).reduce(function(a,s){ return a+(+(s.billing_amount)||0); }, 0);
+  var billed = DB.ships.filter(function(s){ return s.billing_status==='Billed'; });
+  var tot  = billed.reduce(function(a,s){ return a+(+(s.billing_amount)||0); }, 0);
+  var paid = billed.filter(function(s){ return s.payment_status==='Received'; }).reduce(function(a,s){ return a+(+(s.billing_amount)||0); }, 0);
+  var outstanding = tot - paid;
+
   document.getElementById('pay-kpis').innerHTML =
-    '<div class="kpi bl"><div class="kpi-lbl">Total Billed</div><div class="kpi-val bl">₹'+fmt(tot)+'</div></div>' +
-    '<div class="kpi gr"><div class="kpi-lbl">Received</div><div class="kpi-val gr">₹'+fmt(paid)+'</div></div>' +
-    '<div class="kpi rd"><div class="kpi-lbl">Outstanding</div><div class="kpi-val rd">₹'+fmt(tot-paid)+'</div></div>';
+    '<div class="kpi bl"><div class="kpi-lbl">Total Billed</div><div class="kpi-val bl mono">₹'+fmt(tot)+'</div></div>' +
+    '<div class="kpi gr"><div class="kpi-lbl">Received</div><div class="kpi-val gr mono">₹'+fmt(paid)+'</div></div>' +
+    '<div class="kpi rd"><div class="kpi-lbl">Outstanding</div><div class="kpi-val rd mono">₹'+fmt(outstanding)+'</div></div>';
+
+  // ── Donut chart: collection progress ──
+  var donutEl = document.getElementById('pay-chart-donut');
+  if (donutEl) {
+    var pct = tot > 0 ? Math.round(paid/tot*100) : 0;
+    var r = 48, cx = 60, cy = 60, stroke = 10;
+    var circumference = 2*Math.PI*r;
+    var dashArr = (pct/100*circumference)+' '+circumference;
+    donutEl.innerHTML =
+      '<div style="display:flex;align-items:center;gap:16px">' +
+      '<svg width="120" height="120" viewBox="0 0 120 120">' +
+        '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="var(--red-l)" stroke-width="'+stroke+'"/>' +
+        '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="var(--green)" stroke-width="'+stroke+'" stroke-dasharray="'+dashArr+'" stroke-dashoffset="'+circumference*0.25+'" stroke-linecap="round" transform="rotate(-90 '+cx+' '+cy+')" style="transition:stroke-dasharray .6s"/>' +
+        '<text x="'+cx+'" y="'+(cy+5)+'" text-anchor="middle" font-size="18" font-weight="700" font-family=\'JetBrains Mono\' fill="var(--t1)">'+pct+'%</text>' +
+      '</svg>' +
+      '<div>' +
+        '<div style="font-size:11px;color:var(--t3);margin-bottom:4px">Collected</div>' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block"></span><span style="font-size:12px">₹'+fmt(paid)+'</span></div>' +
+        '<div style="font-size:11px;color:var(--t3);margin-bottom:4px">Outstanding</div>' +
+        '<div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:var(--red-l);border:1.5px solid var(--red);display:inline-block"></span><span style="font-size:12px;color:var(--red-b)">₹'+fmt(outstanding)+'</span></div>' +
+      '</div></div>';
+  }
+
+  // ── Customer pending bar chart ──
+  var custEl = document.getElementById('pay-chart-cust');
+  if (custEl) {
+    var custPending = {};
+    DB.ships.filter(function(s){ return s.billing_status==='Billed' && s.payment_status!=='Received'; }).forEach(function(s) {
+      var amt = +(s.billing_amount)||0;
+      if (!custPending[s.customer_name]) custPending[s.customer_name] = 0;
+      custPending[s.customer_name] += amt;
+    });
+    var custArr = Object.entries(custPending).sort(function(a,b){ return b[1]-a[1]; }).slice(0,6);
+    var maxC = custArr.length ? custArr[0][1] : 1;
+    if (!custArr.length) {
+      custEl.innerHTML = '<div style="color:var(--t3);font-size:12px;text-align:center;padding:20px">No pending collections 🎉</div>';
+    } else {
+      custEl.innerHTML = custArr.map(function(e) {
+        var barW = Math.max(4, Math.round(e[1]/maxC*100));
+        return '<div style="margin-bottom:8px">' +
+          '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">' +
+            '<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px">'+e[0]+'</span>' +
+            '<span class="mono" style="color:var(--red-b);flex-shrink:0">₹'+fmt(e[1])+'</span>' +
+          '</div>' +
+          '<div style="height:8px;background:var(--s2);border-radius:4px;overflow:hidden">' +
+            '<div style="height:100%;width:'+barW+'%;background:linear-gradient(90deg,var(--red),#f87171);border-radius:4px;transition:width .5s"></div>' +
+          '</div></div>';
+      }).join('');
+    }
+  }
+
+  // ── Vendor payables ──
+  var vendorEl = document.getElementById('pay-chart-vendor');
+  if (vendorEl) {
+    var vendPending = {};
+    DB.ships.filter(function(s){ return (+(s.vendor_cost)||0)>0 && s.vendor_payment_status!=='Paid'; }).forEach(function(s) {
+      var name = s.vendor_name || 'Unknown Vendor';
+      if (!vendPending[name]) vendPending[name] = 0;
+      vendPending[name] += +(s.vendor_cost)||0;
+    });
+    var vendArr = Object.entries(vendPending).sort(function(a,b){ return b[1]-a[1]; }).slice(0,6);
+    var maxV = vendArr.length ? vendArr[0][1] : 1;
+    if (!vendArr.length) {
+      vendorEl.innerHTML = '<div style="color:var(--t3);font-size:12px;text-align:center;padding:20px">No vendor payables 🎉</div>';
+    } else {
+      vendorEl.innerHTML = vendArr.map(function(e) {
+        var barW = Math.max(4, Math.round(e[1]/maxV*100));
+        return '<div style="margin-bottom:8px">' +
+          '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">' +
+            '<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px">'+e[0]+'</span>' +
+            '<span class="mono" style="color:var(--amber-b);flex-shrink:0">₹'+fmt(e[1])+'</span>' +
+          '</div>' +
+          '<div style="height:8px;background:var(--s2);border-radius:4px;overflow:hidden">' +
+            '<div style="height:100%;width:'+barW+'%;background:linear-gradient(90deg,var(--amber),#fcd34d);border-radius:4px;transition:width .5s"></div>' +
+          '</div></div>';
+      }).join('');
+    }
+  }
+
   document.getElementById('pay-tb').innerHTML = DB.pays.length ? DB.pays.map(function(p) {
     return '<tr>' +
       '<td class="mono" style="font-size:11px">'+(p.date||'—')+'</td>' +
@@ -2795,7 +3179,7 @@ function renderPays() {
       '<td>'+(p.status==='Paid'?'<span class="badge b-gr">Paid</span>':'<span class="badge b-am">Pending</span>')+'</td>' +
       '<td>'+(p.status!=='Paid'?'<button class="btn btn-xs btn-p" onclick="markPayPaid(\''+p.id+'\')">Mark Paid</button>':'')+'</td>' +
       '</tr>';
-  }).join('') : '<tr><td colspan="9" class="t-empty">No payment records</td></tr>';
+  }).join('') : '<tr><td colspan="9" class="t-empty">No payment records yet — add payments using "+ Add Payment"</td></tr>';
 }
 function openPayModal() {
   document.getElementById('pay-form').innerHTML =
