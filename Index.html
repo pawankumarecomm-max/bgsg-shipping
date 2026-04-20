@@ -69,7 +69,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;font-size:13px;background:v
 .srch-sub{font-size:11px;color:var(--t3);margin-top:1px}
 
 /* Content */
-.content{flex:1;overflow-y:auto;padding:20px}
+.content{flex:1;overflow-y:auto;padding:14px}
 .page{display:none}
 .page.active{display:block}
 
@@ -94,8 +94,8 @@ html,body{height:100%;font-family:'Inter',sans-serif;font-size:13px;background:v
 .sh-right{display:flex;gap:7px;align-items:center;flex-shrink:0}
 
 /* KPI */
-.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
-.kpi{background:linear-gradient(180deg,#ffffff 0%,#fbfdff 100%);border:1px solid var(--b1);border-radius:var(--r);padding:14px 16px;cursor:pointer;transition:all .15s;border-top:3px solid transparent;box-shadow:0 3px 12px rgba(16,36,63,.04)}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+.kpi{background:linear-gradient(180deg,#ffffff 0%,#fbfdff 100%);border:1px solid var(--b1);border-radius:var(--r);padding:10px 14px;cursor:pointer;transition:all .15s;border-top:3px solid transparent;box-shadow:0 3px 12px rgba(16,36,63,.04)}
 .kpi:hover{box-shadow:0 2px 12px rgba(0,0,0,.08);transform:translateY(-1px)}
 .kpi.gr{border-top-color:var(--green)}
 .kpi.bl{border-top-color:var(--blue)}
@@ -103,7 +103,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;font-size:13px;background:v
 .kpi.rd{border-top-color:var(--red)}
 .kpi.te{border-top-color:var(--teal)}
 .kpi-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--t3);margin-bottom:6px}
-.kpi-val{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--t1);line-height:1}
+.kpi-val{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:var(--t1);line-height:1}
 .kpi-val.gr{color:var(--green)}
 .kpi-val.bl{color:var(--blue)}
 .kpi-val.am{color:var(--amber)}
@@ -278,15 +278,15 @@ textarea.fi{resize:vertical;min-height:65px}
 .pgn-n.active{background:var(--green);color:#fff;border-color:var(--green)}
 
 /* Charts */
-.bar-chart{display:flex;gap:6px;align-items:flex-end;height:90px}
-.bc-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
-.bc-bar{width:100%;border-radius:3px 3px 0 0;min-height:4px}
+.bar-chart{display:flex;gap:8px;align-items:flex-end;height:100px;padding:0 4px}
+.bc-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:0;min-width:0}
+.bc-bar{width:100%;border-radius:4px 4px 0 0;min-height:4px;flex-shrink:0}
 .bc-bar.gr{background:var(--green)}
 .bc-bar.bl{background:var(--blue)}
 .bc-bar.am{background:var(--amber)}
 .bc-bar.te{background:var(--teal)}
-.bc-lbl{font-size:9px;color:var(--t3);text-align:center}
-.bc-val{font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--t2)}
+.bc-lbl{font-size:9px;color:var(--t3);text-align:center;margin-top:4px;white-space:nowrap}
+.bc-val{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t2);margin-bottom:3px;font-weight:700}
 
 /* Loading */
 .loading{display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:#f1f5f9;z-index:999;flex-direction:column;gap:12px}
@@ -459,60 +459,61 @@ tr.row-intransit td:first-child { border-left: 3px solid var(--amber); }
 
     <!-- DASHBOARD -->
     <div class="page active" id="pg-dashboard">
-      <div class="sh">
+      <div class="sh" style="margin-bottom:10px">
         <div><div class="sh-title">Dashboard</div><div class="sh-sub" id="today-txt"></div></div>
         <button class="btn btn-sm" onclick="renderDash()">↻ Refresh</button>
       </div>
-      <!-- KPI Row 1 -->
-      <div class="kpi-grid" id="kpi1"></div>
-      <!-- KPI Row 2 -->
-      <div class="kpi-grid" id="kpi2"></div>
-      <!-- Revenue + Collection summary strip -->
-      <div id="dash-fin-strip" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px"></div>
-      <!-- Main content area -->
-      <div class="dg">
-        <div class="card">
-          <div class="card-h" style="justify-content:space-between">
+      <!-- KPI rows -->
+      <div class="kpi-grid" style="margin-bottom:8px" id="kpi1"></div>
+      <div class="kpi-grid" style="margin-bottom:8px" id="kpi2"></div>
+      <!-- Financial strip -->
+      <div id="dash-fin-strip" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px"></div>
+      <!-- Main 2-col row -->
+      <div style="display:grid;grid-template-columns:1fr 340px;gap:10px;margin-bottom:10px">
+        <!-- Recent shipments -->
+        <div class="card" style="margin-bottom:0">
+          <div class="card-h" style="padding:8px 12px">
             <span class="card-title">📦 Recent Shipments</span>
             <button class="btn btn-sm" onclick="nav('shipments')">View All →</button>
           </div>
           <div class="tw" id="dash-recent"></div>
         </div>
-        <div>
-          <div class="card" style="margin-bottom:12px">
-            <div class="card-h"><span class="card-title">📊 By Mode</span></div>
-            <div class="card-b" id="dash-mode"></div>
+        <!-- Right column -->
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="card" style="margin-bottom:0">
+            <div class="card-h" style="padding:8px 12px"><span class="card-title">📊 By Mode</span></div>
+            <div class="card-b" style="padding:10px" id="dash-mode"></div>
           </div>
-          <div class="card">
-            <div class="card-h"><span class="card-title">🔔 Follow-up Today</span></div>
+          <div class="card" style="margin-bottom:0">
+            <div class="card-h" style="padding:8px 12px"><span class="card-title">🔔 Follow-up Today</span></div>
             <div id="dash-followup"></div>
           </div>
         </div>
       </div>
-      <!-- Bottom row -->
-      <div class="dg3">
-        <div class="card">
-          <div class="card-h"><span class="card-title">🚨 Overdue</span></div>
+      <!-- Bottom 3-col row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="card" style="margin-bottom:0">
+          <div class="card-h" style="padding:8px 12px"><span class="card-title">🚨 Overdue</span></div>
           <div id="dash-overdue"></div>
         </div>
-        <div class="card">
-          <div class="card-h"><span class="card-title">📈 Stage Distribution</span></div>
-          <div class="card-b" id="dash-stage"></div>
+        <div class="card" style="margin-bottom:0">
+          <div class="card-h" style="padding:8px 12px"><span class="card-title">📈 Stage Distribution</span></div>
+          <div class="card-b" style="padding:10px" id="dash-stage"></div>
         </div>
-        <div class="card">
-          <div class="card-h"><span class="card-title">⚡ Recent Activity</span></div>
-          <div id="dash-activity" style="max-height:200px;overflow-y:auto"></div>
+        <div class="card" style="margin-bottom:0">
+          <div class="card-h" style="padding:8px 12px"><span class="card-title">⚡ Recent Activity</span></div>
+          <div id="dash-activity" style="max-height:180px;overflow-y:auto"></div>
         </div>
       </div>
-      <!-- Top customers strip -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <!-- Bottom 2-col row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
         <div class="card" style="margin-bottom:0">
-          <div class="card-h"><span class="card-title">🏆 Top Customers by Revenue</span></div>
-          <div class="card-b" id="dash-top-cust"></div>
+          <div class="card-h" style="padding:8px 12px"><span class="card-title">🏆 Top Customers by Revenue</span></div>
+          <div class="card-b" style="padding:10px" id="dash-top-cust"></div>
         </div>
         <div class="card" style="margin-bottom:0">
-          <div class="card-h"><span class="card-title">💳 Payment Health</span></div>
-          <div class="card-b" id="dash-pay-health"></div>
+          <div class="card-h" style="padding:8px 12px"><span class="card-title">💳 Payment Health</span></div>
+          <div class="card-b" style="padding:10px" id="dash-pay-health"></div>
         </div>
       </div>
     </div>
@@ -1368,9 +1369,12 @@ function renderDash() {
   document.getElementById('dash-mode').innerHTML = '<div class="bar-chart">'+
     Object.entries(mc).sort(function(a,b){return b[1]-a[1];}).map(function(e){
       var clr=mclr[e[0]]||'var(--green)';
-      return '<div class="bc-wrap"><div class="bc-val" style="font-weight:700">'+e[1]+'</div>' +
-        '<div class="bc-bar" style="height:'+Math.max(6,e[1]/mm*72)+'px;background:linear-gradient(180deg,'+clr+','+clr+'99);border-radius:4px 4px 0 0"></div>' +
-        '<div class="bc-lbl" style="font-size:9px;font-weight:600">'+e[0]+'</div></div>';
+      var h = Math.max(8, Math.round(e[1]/mm*80));
+      return '<div class="bc-wrap">' +
+        '<div class="bc-val">'+e[1]+'</div>' +
+        '<div class="bc-bar" style="height:'+h+'px;background:'+clr+';width:100%"></div>' +
+        '<div class="bc-lbl">'+e[0]+'</div>' +
+      '</div>';
     }).join('')+'</div>';
 
   // ── Follow-up ──
