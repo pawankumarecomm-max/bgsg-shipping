@@ -596,13 +596,33 @@ tr.row-intransit td:first-child { border-left: 3px solid var(--amber); }
       </div>
       <div id="quot-compare-panel" style="display:none"></div>
       <div class="fb">
-        <input id="qf-q" placeholder="🔍 Search quotations…">
-        <select id="qf-st"><option value="">All Status</option><option>Draft</option><option>Sent</option><option>Approved</option><option>Rejected</option></select>
+        <input id="qf-q" placeholder="🔍 Quote No. / Customer / Route…" style="min-width:200px" oninput="renderQuots()">
+        <select id="qf-st" onchange="renderQuots()"><option value="">All Status</option><option>Draft</option><option>Sent</option><option>Approved</option><option>Rejected</option></select>
+        <select id="qf-mode" onchange="renderQuots()"><option value="">All Modes</option><option>Air</option><option>Sea LCL</option><option>Sea FCL</option><option>Road</option></select>
+        <input type="date" id="qf-from" title="From date" onchange="renderQuots()">
+        <input type="date" id="qf-to" title="To date" onchange="renderQuots()">
+        <button class="btn btn-sm" onclick="clearQuotFilters()">✕ Clear</button>
         <span class="fc" id="quot-count"></span>
       </div>
       <div class="card"><div class="tw">
-        <table><thead><tr><th>Quote No.</th><th>Date</th><th>Customer</th><th>Job No.</th><th>Route</th><th>Mode</th><th>Basic Cost</th><th>GST</th><th>Total Sell</th><th>Per Unit</th><th>Margin</th><th>Status</th><th></th></tr></thead>
-        <tbody id="quot-tb"></tbody></table>
+        <table id="quot-table">
+          <thead><tr>
+            <th style="width:110px">Quote No.</th>
+            <th style="width:90px">Date</th>
+            <th style="min-width:120px">Customer</th>
+            <th style="width:90px">Job No.</th>
+            <th style="min-width:130px">Route</th>
+            <th style="width:75px">Mode</th>
+            <th style="width:80px">Ch. Wt</th>
+            <th style="width:95px;text-align:right">Buy Cost</th>
+            <th style="width:95px;text-align:right">Sell Amount</th>
+            <th style="width:85px;text-align:right">Margin</th>
+            <th style="width:70px;text-align:right">Margin%</th>
+            <th style="width:75px">Status</th>
+            <th style="width:160px;text-align:center">Actions</th>
+          </tr></thead>
+          <tbody id="quot-tb"></tbody>
+        </table>
       </div></div>
     </div>
 
@@ -735,10 +755,18 @@ tr.row-intransit td:first-child { border-left: 3px solid var(--amber); }
   </div>
 </div>
 <div class="mo" id="mo-quot">
-  <div class="mo-box">
-    <div class="mo-head"><div class="mo-title">Quotation</div><button class="mo-x" onclick="closeMo('mo-quot')">×</button></div>
-    <div class="mo-body" id="quot-form"></div>
-    <div class="mo-foot"><button class="btn" onclick="closeMo('mo-quot')">Cancel</button><button class="btn btn-p" onclick="saveQuot()">Save</button></div>
+  <div class="mo-box lg" style="max-width:1100px">
+    <div class="mo-head"><div class="mo-title" id="mo-quot-title">Quotation</div><button class="mo-x" onclick="closeMo('mo-quot')">×</button></div>
+    <div class="mo-body" style="padding:14px" id="quot-form"></div>
+    <div class="mo-foot"><button class="btn" onclick="closeMo('mo-quot')">Cancel</button><button class="btn btn-p" onclick="saveQuot()">💾 Save Quotation</button></div>
+  </div>
+</div>
+<!-- Quotation View Modal -->
+<div class="mo" id="mo-quot-view">
+  <div class="mo-box lg" style="max-width:1100px">
+    <div class="mo-head"><div class="mo-title" id="mo-qv-title">Quotation Detail</div><button class="mo-x" onclick="closeMo('mo-quot-view')">×</button></div>
+    <div class="mo-body" style="padding:14px" id="quot-view-body"></div>
+    <div class="mo-foot"><button class="btn" onclick="closeMo('mo-quot-view')">Close</button></div>
   </div>
 </div>
 <div class="mo" id="mo-bill">
@@ -1000,7 +1028,7 @@ window.addEventListener('load', function() {
     if (el) el.addEventListener('change', renderShips);
     if (el && el.tagName === 'INPUT') el.addEventListener('input', renderShips);
   });
-  ['qf-q','qf-st'].forEach(function(id){ var el=document.getElementById(id); if(el){el.addEventListener('input',renderQuots);el.addEventListener('change',renderQuots);} });
+  ['qf-q','qf-st','qf-mode','qf-from','qf-to'].forEach(function(id){ var el=document.getElementById(id); if(el){el.addEventListener('input',renderQuots);el.addEventListener('change',renderQuots);} });
   ['docf-q','docf-st'].forEach(function(id){ var el=document.getElementById(id); if(el){el.addEventListener('input',renderDocs);el.addEventListener('change',renderDocs);} });
   ['custf-q','custf-st'].forEach(function(id){ var el=document.getElementById(id); if(el){el.addEventListener('input',renderCust);el.addEventListener('change',renderCust);} });
   ['delf-q','delf-st'].forEach(function(id){ var el=document.getElementById(id); if(el){el.addEventListener('input',renderDel);el.addEventListener('change',renderDel);} });
@@ -2155,115 +2183,426 @@ function confirmDel() {
 }
 
 // ── QUOTATIONS ────────────────────────────────────────────
-function renderQuots() {
-  var q = (document.getElementById('qf-q').value||'').toLowerCase();
-  var st = document.getElementById('qf-st').value||'';
-  var data = DB.quots.filter(function(x){
-    return (!q || (x.quote_number+' '+x.customer_name).toLowerCase().indexOf(q)>=0) && (!st || x.status===st);
+function clearQuotFilters() {
+  ['qf-q','qf-st','qf-mode','qf-from','qf-to'].forEach(function(id){
+    var el = document.getElementById(id); if(el) el.value='';
   });
-  document.getElementById('quot-count').textContent = data.length + ' quotations';
+  renderQuots();
+}
+
+function renderQuots() {
+  var q    = (document.getElementById('qf-q')||{value:''}).value.toLowerCase();
+  var st   = (document.getElementById('qf-st')||{value:''}).value;
+  var mode = (document.getElementById('qf-mode')||{value:''}).value;
+  var from = (document.getElementById('qf-from')||{value:''}).value;
+  var to   = (document.getElementById('qf-to')||{value:''}).value;
+
+  var data = DB.quots.filter(function(x){
+    if (q && (x.quote_number+' '+x.customer_name+' '+(x.origin||'')+' '+(x.destination||'')).toLowerCase().indexOf(q)<0) return false;
+    if (st && x.status !== st) return false;
+    if (mode && x.mode !== mode) return false;
+    if (from && x.date && x.date < from) return false;
+    if (to   && x.date && x.date > to)   return false;
+    return true;
+  });
+
+  document.getElementById('quot-count').textContent = data.length + ' quotation' + (data.length===1?'':'s');
+
   document.getElementById('quot-tb').innerHTML = data.length ? data.map(function(q) {
-    var m = (+(q.sell_amount)||0) - (+(q.buy_cost)||0);
+    var buy  = +(q.buy_cost)||0;
+    var sell = +(q.sell_amount)||0;
+    var m    = sell - buy;
+    var mpct = buy > 0 ? Math.round(m / buy * 100) : (sell > 0 ? 100 : 0);
+    var wt   = q.chargeable_weight ? (q.chargeable_weight + ' kg') : (q.units ? q.units + ' u' : '—');
     return '<tr>' +
-      '<td class="mono" style="color:var(--green-b);font-weight:700">'+(q.quote_number||'')+'</td>' +
-      '<td class="mono" style="font-size:11px">'+(q.date||'')+'</td>' +
-      '<td style="font-weight:600">'+(q.customer_name||'')+'</td>' +
-      '<td style="font-size:12px">'+(q.origin||'—')+' → '+(q.destination||'—')+'</td>' +
+      '<td class="mono" style="color:var(--green-b);font-weight:700;white-space:nowrap">'+(q.quote_number||'—')+'</td>' +
+      '<td class="mono" style="font-size:11px;white-space:nowrap;color:var(--t2)">'+(q.date||'—')+'</td>' +
+      '<td style="font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis">'+(q.customer_name||'—')+'</td>' +
+      '<td class="mono" style="font-size:11px;color:var(--blue-b)">'+(q.job_number||'<span style="color:var(--t3)">—</span>')+'</td>' +
+      '<td style="font-size:11px;white-space:nowrap">'+(q.origin||'—')+' → '+(q.destination||'—')+'</td>' +
       '<td>'+modeTag(q.mode)+'</td>' +
-      '<td class="mono" style="font-size:11px">₹'+fmt(+(q.buy_cost)||0)+'</td>' +
-      '<td class="mono" style="font-size:11px">₹'+fmt(+(q.sell_amount)||0)+'</td>' +
-      '<td><span class="pb '+(m>=0?'pb-p':'pb-n')+'">₹'+fmt(Math.abs(m))+'</span></td>' +
+      '<td class="mono" style="font-size:11px;color:var(--t2);text-align:right">'+wt+'</td>' +
+      '<td class="mono" style="font-size:11px;text-align:right;color:var(--amber-b)">₹'+fmt(buy)+'</td>' +
+      '<td class="mono" style="font-size:11px;text-align:right;color:var(--blue-b)">₹'+fmt(sell)+'</td>' +
+      '<td class="mono" style="text-align:right"><span class="pb '+(m>=0?'pb-p':'pb-n')+'">₹'+fmt(Math.abs(m))+'</span></td>' +
+      '<td class="mono" style="text-align:right;font-size:11px;font-weight:700;color:'+(mpct>=0?'var(--green-b)':'var(--red-b)')+'">'+mpct+'%</td>' +
       '<td>'+qsbadge(q.status)+'</td>' +
-      '<td>' +
+      '<td style="white-space:nowrap;text-align:center">' +
+        '<button class="btn btn-xs btn-bl" onclick="viewQuot(\''+q.id+'\')">👁</button> ' +
         '<button class="btn btn-xs" onclick="editQuotFn(\''+q.id+'\')">Edit</button> ' +
+        '<button class="btn btn-xs btn-am" onclick="copyQuot(\''+q.id+'\')" title="Copy into new quotation">⧉</button> ' +
         '<button class="btn btn-xs btn-rd" onclick="delQuot(\''+q.id+'\')">Del</button>' +
       '</td>' +
-      '</tr>';
-  }).join('') : '<tr><td colspan="10" class="t-empty">No quotations</td></tr>';
+    '</tr>';
+  }).join('') : '<tr><td colspan="13" class="t-empty">No quotations found</td></tr>';
 }
+// ── CHARGE HEADS — mode based ─────────────────────────────
+var CHARGE_HEADS_AIR = [
+  'Air Freight Charges','AMS Fee (Per MAWB & HAWB)','Agency Charges','AWB Charges',
+  'Custom Clearance Charges','TC at Actual','Documentation Fees','Transportation',
+  'Delivery Charges','Handling Charges','Palletization','Miscellaneous Charges (if any)',
+  'GST Charges if Applicable'
+];
+var CHARGE_HEADS_SEA = [
+  'OCEAN FREIGHT CHARGES','Origin (DDC Charges)','THC (AT ACTUAL)','BL FEES (PER BL)',
+  'CUSTOM CLEARANCE CHARGES','Measurement','Palletization','Labelling & Marking',
+  'Warehousing /Loading Unloading','DOCUMENTATION','Examination ADC NOC (Approx)',
+  'TRANSPORTATION','COLOADER Destination CHARGES','Destination DO','DAP Delivery',
+  'HANDLING','GST Charges'
+];
+
+// Templates stored in localStorage
+function getTemplates() {
+  try { return JSON.parse(localStorage.getItem('bgsg_quot_templates')||'[]'); } catch(e){ return []; }
+}
+function saveTemplates(arr) {
+  try { localStorage.setItem('bgsg_quot_templates', JSON.stringify(arr)); } catch(e){}
+}
+
+// current charge rows state
+var qRecvRows = [], qSentRows = [];
+
+function chargeHeadsForMode(mode) {
+  return (mode && (mode.indexOf('Sea')>=0 || mode.indexOf('sea')>=0 || mode==='Sea LCL' || mode==='Sea FCL'))
+    ? CHARGE_HEADS_SEA : CHARGE_HEADS_AIR;
+}
+function defaultChargeRows(mode) {
+  return chargeHeadsForMode(mode).map(function(h){ return {desc:h, rate:'', qty:'1', total:''}; });
+}
+function allChargeHeads() {
+  var all = CHARGE_HEADS_AIR.concat(CHARGE_HEADS_SEA);
+  return all.filter(function(v,i){ return all.indexOf(v)===i; });
+}
+
 function openNewQuot() {
   editQuotId = null;
-  buildQuotForm({date: new Date().toISOString().slice(0,10), quote_number:'QT'+new Date().getFullYear()+String(DB.quots.length+1).padStart(4,'0'), status:'Draft'});
-  qMargin();
+  document.getElementById('mo-quot-title').textContent = 'New Quotation';
+  qRecvRows = defaultChargeRows('Air');
+  qSentRows = defaultChargeRows('Air');
+  buildQuotForm({date: new Date().toISOString().slice(0,10), quote_number:'QT'+new Date().getFullYear()+String(DB.quots.length+1).padStart(4,'0'), status:'Draft', mode:'Air'});
   openMo('mo-quot');
 }
+
+// Copy an old quotation into a new one
+function copyQuot(id) {
+  var src = DB.quots.find(function(x){ return x.id===id; });
+  if (!src) return;
+  editQuotId = null;
+  document.getElementById('mo-quot-title').textContent = 'New Quotation (Copied from '+esc(src.quote_number||'—')+')';
+  qRecvRows = (src.recv_charges && src.recv_charges.length) ? src.recv_charges.map(function(r){ return Object.assign({},r); }) : defaultChargeRows(src.mode);
+  qSentRows = (src.sent_charges && src.sent_charges.length) ? src.sent_charges.map(function(r){ return Object.assign({},r); }) : defaultChargeRows(src.mode);
+  buildQuotForm(Object.assign({}, src, {
+    id: null,
+    quote_number: 'QT'+new Date().getFullYear()+String(DB.quots.length+1).padStart(4,'0'),
+    date: new Date().toISOString().slice(0,10),
+    status: 'Draft',
+    job_number: null
+  }));
+  openMo('mo-quot');
+}
+
+// Save current quotation as a template
+function saveAsTemplate() {
+  var name = prompt('Template name (e.g. "BOM-LHR Air Standard"):');
+  if (!name) return;
+  var templates = getTemplates();
+  templates.push({
+    id: 't'+Date.now(),
+    name: name,
+    mode: (document.getElementById('q_md')||{}).value || 'Air',
+    recv_charges: qRecvRows.map(function(r){ return Object.assign({},r); }),
+    sent_charges: qSentRows.map(function(r){ return Object.assign({},r); }),
+    created_at: new Date().toISOString()
+  });
+  saveTemplates(templates);
+  toast('Template saved: '+name+' ✓','ok');
+}
+
+// Load from template
+function loadFromTemplate(tid) {
+  var templates = getTemplates();
+  var t = templates.find(function(x){ return x.id===tid; });
+  if (!t) return;
+  qRecvRows = t.recv_charges.map(function(r){ return Object.assign({},r); });
+  qSentRows = t.sent_charges.map(function(r){ return Object.assign({},r); });
+  buildQuotFormCharges();
+  qCalcTotals();
+  toast('Template loaded: '+t.name+' ✓','ok');
+}
+
+// Delete template
+function delTemplate(tid) {
+  var templates = getTemplates().filter(function(x){ return x.id!==tid; });
+  saveTemplates(templates);
+  renderTemplatePanel();
+  toast('Template deleted','ok');
+}
+
+function renderTemplatePanel() {
+  var el = document.getElementById('q-template-panel');
+  if (!el) return;
+  var templates = getTemplates();
+  if (!templates.length) {
+    el.innerHTML = '<span style="font-size:11px;color:var(--t3)">No templates saved yet. Fill charges and click "Save as Template".</span>';
+    return;
+  }
+  el.innerHTML = templates.map(function(t){
+    return '<div style="display:inline-flex;align-items:center;gap:6px;background:var(--s1);border:1px solid var(--b1);border-radius:4px;padding:3px 8px;margin:2px">' +
+      '<span style="font-size:11px;font-weight:600;color:var(--t2)">'+esc(t.name)+'</span>' +
+      '<span style="font-size:10px;color:var(--t3)">'+modeTag(t.mode)+'</span>' +
+      '<button class="btn btn-xs btn-bl" onclick="loadFromTemplate(\''+t.id+'\')">Load</button>' +
+      '<span style="cursor:pointer;color:var(--t3);font-size:12px" onclick="delTemplate(\''+t.id+'\')">×</span>' +
+    '</div>';
+  }).join('');
+}
+
+// When mode changes, offer to reset charge heads
+function qOnModeChange(val) {
+  var current = (qRecvRows||[]).map(function(r){ return r.desc; }).join(',');
+  var airHeads = CHARGE_HEADS_AIR.join(',');
+  var seaHeads = CHARGE_HEADS_SEA.join(',');
+  var isDefault = (current === airHeads || current === seaHeads);
+  if (isDefault) {
+    // Auto-switch silently if rows are still default/empty
+    var hasData = qRecvRows.some(function(r){ return r.rate||r.total; });
+    if (!hasData) {
+      qRecvRows = defaultChargeRows(val);
+      qSentRows = defaultChargeRows(val);
+      buildQuotFormCharges();
+      qCalcTotals();
+      toast('Charge heads updated for '+val+' mode ✓','ok');
+      return;
+    }
+  }
+  if (confirm('Switch charge heads to '+val+' mode? (Current rates will be cleared)')) {
+    qRecvRows = defaultChargeRows(val);
+    qSentRows = defaultChargeRows(val);
+    buildQuotFormCharges();
+    qCalcTotals();
+    toast('Charge heads updated for '+val+' mode ✓','ok');
+  }
+}
+
 function editQuotFn(id) {
   var q = DB.quots.find(function(x){ return x.id===id; });
   if (!q) return;
-  editQuotId = id; buildQuotForm(q); qMargin(); openMo('mo-quot');
+  editQuotId = id;
+  document.getElementById('mo-quot-title').textContent = 'Edit Quotation';
+  // Load saved charge rows or mode-based defaults
+  qRecvRows = (q.recv_charges && q.recv_charges.length) ? q.recv_charges : defaultChargeRows(q.mode);
+  qSentRows = (q.sent_charges && q.sent_charges.length) ? q.sent_charges : defaultChargeRows(q.mode);
+  buildQuotForm(q);
+  openMo('mo-quot');
 }
+
+function viewQuot(id) {
+  var q = DB.quots.find(function(x){ return x.id===id; });
+  if (!q) return;
+  var recv = q.recv_charges || [];
+  var sent = q.sent_charges || [];
+  var buyCost = recv.reduce(function(a,r){ return a+(parseFloat(r.total)||0); },0);
+  var sellAmt = sent.reduce(function(a,r){ return a+(parseFloat(r.total)||0); },0);
+  var margin = sellAmt - buyCost;
+  function chargeTable(rows, color, title) {
+    return '<div style="flex:1;min-width:0">' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:'+color+';margin-bottom:8px;padding:6px 10px;background:'+color+'18;border-radius:4px">'+title+'</div>' +
+      '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+        '<thead><tr>' +
+          '<th style="text-align:left;padding:6px 8px;background:var(--s2);border:1px solid var(--b1);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Charge Description</th>' +
+          '<th style="text-align:right;padding:6px 8px;background:var(--s2);border:1px solid var(--b1);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Rate (INR)</th>' +
+          '<th style="text-align:right;padding:6px 8px;background:var(--s2);border:1px solid var(--b1);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Qty</th>' +
+          '<th style="text-align:right;padding:6px 8px;background:var(--s2);border:1px solid var(--b1);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Total (INR)</th>' +
+        '</tr></thead><tbody>' +
+        rows.map(function(r){
+          var t = parseFloat(r.total)||0;
+          var isEmpty = !r.rate && !r.total;
+          return '<tr>' +
+            '<td style="padding:6px 8px;border:1px solid var(--b1);font-size:12px">' + esc(r.desc||'') + '</td>' +
+            '<td style="padding:6px 8px;border:1px solid var(--b1);text-align:right;font-family:monospace">'+(isEmpty?'<span style="color:var(--t3)">-</span>':fmt(parseFloat(r.rate)||0))+'</td>' +
+            '<td style="padding:6px 8px;border:1px solid var(--b1);text-align:right;font-family:monospace">'+(r.qty||1)+'</td>' +
+            '<td style="padding:6px 8px;border:1px solid var(--b1);text-align:right;font-family:monospace;font-weight:600;color:'+(isEmpty?'var(--t3)':t>0?color:'var(--t1)')+'>'+(isEmpty?'-':'₹'+fmt(t))+'</td>' +
+          '</tr>';
+        }).join('') +
+        '<tr style="background:var(--s2)"><td colspan="3" style="padding:7px 8px;border:1px solid var(--b1);font-weight:700;font-size:12px">TOTAL</td>' +
+        '<td style="padding:7px 8px;border:1px solid var(--b1);text-align:right;font-family:monospace;font-weight:700;font-size:14px;color:'+color+'">₹'+fmt(rows.reduce(function(a,r){return a+(parseFloat(r.total)||0);},0))+'</td></tr>' +
+      '</tbody></table></div>';
+  }
+  document.getElementById('mo-qv-title').textContent = (q.quote_number||'Quotation')+' — '+(q.customer_name||'');
+  document.getElementById('quot-view-body').innerHTML =
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">' +
+      '<span style="font-size:12px;color:var(--t2)">📅 '+fmtD(q.date)+'</span>' +
+      '<span style="font-size:12px;color:var(--t2)">📍 '+(q.origin||'—')+' → '+(q.destination||'—')+'</span>' +
+      '<span style="font-size:12px;color:var(--t2)">'+modeTag(q.mode)+'</span>' +
+      qsbadge(q.status) +
+    '</div>' +
+    '<div style="display:flex;gap:14px;margin-bottom:14px">' +
+      chargeTable(recv,'var(--teal-b,#0f766e)','📥 Received (Vendor / Buy Cost)') +
+      chargeTable(sent,'var(--blue-b)','📤 Sent (Customer / Sell Amount)') +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:12px">' +
+      '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:4px">Buy Cost</div><div class="mono" style="font-size:18px;font-weight:700;color:var(--t1)">₹'+fmt(buyCost)+'</div></div>' +
+      '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:4px">Sell Amount</div><div class="mono" style="font-size:18px;font-weight:700;color:var(--blue-b)">₹'+fmt(sellAmt)+'</div></div>' +
+      '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:4px">Margin</div><div class="mono" style="font-size:18px;font-weight:700;color:'+(margin>=0?'var(--green-b)':'var(--red-b)')+'">₹'+fmt(Math.abs(margin))+' '+(margin>=0?'▲':'▼')+'</div></div>' +
+    '</div>' +
+    (q.notes ? '<div style="margin-top:10px;font-size:12px;color:var(--t2);background:var(--s2);border-radius:4px;padding:8px">📝 '+esc(q.notes)+'</div>' : '');
+  openMo('mo-quot-view');
+}
+
 function buildQuotForm(q) {
   if (!q) q = {};
   var jobOptions = DB.ships.map(function(s){ return '<option value="'+s.job_number+'">'+s.job_number+' — '+s.customer_name+'</option>'; }).join('');
   document.getElementById('quot-form').innerHTML =
-    '<div class="fg">' +
+    // Header fields
+    '<div class="fg" style="margin-bottom:12px">' +
     '<div class="fgi"><label class="fl">Quote Number</label><input class="fi" id="q_qn" value="'+(q.quote_number||'')+'"></div>' +
     '<div class="fgi"><label class="fl">Date</label><input class="fi" type="date" id="q_dt" value="'+(normDate(q.date)||'')+'"></div>' +
     '<div class="fgi"><label class="fl">Customer *</label><div style="display:flex;gap:6px;align-items:center"><input class="fi" list="customer-list-quot" id="q_cn" value="'+esc(q.customer_name||'')+'" placeholder="Search or type customer"><button type="button" class="btn btn-sm" onclick="saveCustomerFromInput(\'q_cn\')">+ Save</button></div>'+customerDatalistHTML('customer-list-quot')+'</div>' +
     '<div class="fgi"><label class="fl">Link to Job No.</label><select class="fi" id="q_jn"><option value="">— Not linked —</option>'+jobOptions+'</select></div>' +
     '<div class="fgi"><label class="fl">Origin</label><input class="fi" id="q_or" value="'+(q.origin||'')+'"></div>' +
     '<div class="fgi"><label class="fl">Destination</label><input class="fi" id="q_ds" value="'+(q.destination||'')+'"></div>' +
-    '<div class="fgi"><label class="fl">Mode</label><select class="fi" id="q_md">'+['Air','Sea LCL','Sea FCL','Road'].map(function(o){ return '<option'+(q.mode===o?' selected':'')+'>'+o+'</option>'; }).join('')+'</select></div>' +
-    '<div class="fgi"><label class="fl">Units / Packages</label><input class="fi" type="number" id="q_units" value="'+(q.units||'')+'" oninput="qMargin()" placeholder="e.g. 100"></div>' +
+    '<div class="fgi"><label class="fl">Mode</label><select class="fi" id="q_md" onchange="qOnModeChange(this.value)">'+['Air','Sea LCL','Sea FCL','Road'].map(function(o){ return '<option'+(q.mode===o?' selected':'')+'>'+o+'</option>'; }).join('')+'</select></div>' +
+    '<div class="fgi"><label class="fl">Units / Packages</label><input class="fi" type="number" id="q_units" value="'+(q.units||'')+'" placeholder="e.g. 100"></div>' +
+    '<div class="fgi"><label class="fl">Chargeable Weight (kg)</label><input class="fi" type="number" id="q_cwt" value="'+(q.chargeable_weight||'')+'" placeholder="e.g. 75"></div>' +
     '<div class="fgi"><label class="fl">Status</label><select class="fi" id="q_st">'+['Draft','Sent','Approved','Rejected'].map(function(o){ return '<option'+(q.status===o?' selected':'')+'>'+o+'</option>'; }).join('')+'</select></div>' +
     '</div>' +
-    '<div style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:12px 14px;margin-top:12px">' +
-      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:10px">💰 Cost Breakdown</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">' +
-        '<div class="fgi"><label class="fl">Buy Cost (₹)</label><input class="fi" type="number" id="q_bc" value="'+(q.buy_cost||'')+'" oninput="qMargin()"></div>' +
-        '<div class="fgi"><label class="fl">Basic Sell (₹)</label><input class="fi" type="number" id="q_sa" value="'+(q.sell_amount||'')+'" oninput="qMargin()"></div>' +
-        '<div class="fgi"><label class="fl">GST Amount (₹)</label><input class="fi" type="number" id="q_gst" value="'+(q.gst_amount||'')+'" oninput="qMargin()"></div>' +
-        '<div class="fgi"><label class="fl">GST % (auto)</label><input class="fi" type="number" id="q_gstp" value="'+(q.gst_pct||18)+'" oninput="qGstFromPct()" placeholder="18"></div>' +
+    // Templates panel
+    '<div style="background:var(--amber-l);border:1px solid var(--amber);border-radius:6px;padding:8px 12px;margin-bottom:10px;display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--amber-b);margin-bottom:4px">📋 Templates</div>' +
+        '<div id="q-template-panel"></div>' +
       '</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--b1)">' +
-        '<div><div style="font-size:10px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Total Sell</div><div class="mono" style="font-size:15px;font-weight:700;color:var(--t1)" id="q-total">₹0</div></div>' +
-        '<div><div style="font-size:10px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Per Unit</div><div class="mono" style="font-size:15px;font-weight:700;color:var(--purple)" id="q-perunit">—</div></div>' +
-        '<div><div style="font-size:10px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Margin</div><div class="mono" style="font-size:15px;font-weight:700" id="q-margin">₹0</div></div>' +
-        '<div><div style="font-size:10px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Margin %</div><div class="mono" style="font-size:15px;font-weight:700" id="q-marginpct">0%</div></div>' +
+      '<button class="btn btn-xs btn-am" onclick="saveAsTemplate()" style="flex-shrink:0;margin-top:2px">💾 Save as Template</button>' +
+    '</div>' +
+    // Two-panel charge tables
+    '<div style="display:flex;gap:12px">' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--teal,#0d9488);margin-bottom:6px;padding:5px 8px;background:#ccfbf180;border-radius:4px;border:1px solid #99f6e4">📥 Received — Vendor Quote (Buy Cost)</div>' +
+        qChargeTableHTML('recv', qRecvRows) +
+        '<div style="margin-top:5px;display:flex;gap:8px;align-items:center"><button class="btn btn-xs" onclick="qAddRow(\'recv\')">+ Add Row</button><span style="font-size:11px;font-weight:700;color:var(--teal,#0d9488)">Total: <span id="q-recv-total" class="mono">₹0</span></span></div>' +
+      '</div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--blue-b);margin-bottom:6px;padding:5px 8px;background:var(--blue-l);border-radius:4px;border:1px solid var(--blue)">📤 Sent — Customer Quote (Sell Amount)</div>' +
+        qChargeTableHTML('sent', qSentRows) +
+        '<div style="margin-top:5px;display:flex;gap:8px;align-items:center"><button class="btn btn-xs" onclick="qAddRow(\'sent\')">+ Add Row</button><span style="font-size:11px;font-weight:700;color:var(--blue-b)">Total: <span id="q-sent-total" class="mono">₹0</span></span></div>' +
       '</div>' +
     '</div>' +
-    '<div class="fgi" style="margin-top:12px"><label class="fl">Notes</label><textarea class="fi" id="q_nt" rows="2">'+(q.notes||'')+'</textarea></div>';
-  // Set job number dropdown value after render
+    // Margin strip
+    '<div style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:10px 14px;margin-top:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px" id="q-margin-strip"></div>' +
+    '<div class="fgi" style="margin-top:10px"><label class="fl">Notes</label><textarea class="fi" id="q_nt" rows="2">'+(q.notes||'')+'</textarea></div>';
   setTimeout(function(){
     var jnEl = document.getElementById('q_jn');
     if (jnEl && q.job_number) jnEl.value = q.job_number;
+    qCalcTotals();
+    renderTemplatePanel();
   }, 0);
 }
-function qMargin() {
-  var b = +(document.getElementById('q_bc')||{}).value||0;
-  var sa = +(document.getElementById('q_sa')||{}).value||0;
-  var gst = +(document.getElementById('q_gst')||{}).value||0;
-  var units = +(document.getElementById('q_units')||{}).value||0;
-  var total = sa + gst;
-  var m = total - b;
-  var mpct = b > 0 ? Math.round(m/b*100) : 0;
-  var perUnit = units > 0 ? total/units : 0;
-  var mel = document.getElementById('q-margin');
-  if (mel) { mel.textContent = '₹'+fmt(Math.abs(m))+' '+(m>=0?'▲':'▼'); mel.style.color = m>=0?'var(--green-b)':'var(--red-b)'; }
-  var tel = document.getElementById('q-total');
-  if (tel) tel.textContent = '₹'+fmt(total);
-  var pel = document.getElementById('q-perunit');
-  if (pel) { pel.textContent = perUnit > 0 ? '₹'+fmt(perUnit) : '—'; }
-  var mpe = document.getElementById('q-marginpct');
-  if (mpe) { mpe.textContent = mpct+'%'; mpe.style.color = mpct>=0?'var(--green-b)':'var(--red-b)'; }
-  // auto-update GST pct field
-  var gpEl = document.getElementById('q_gstp');
-  if (gpEl && sa > 0 && gst > 0) gpEl.value = Math.round(gst/sa*100);
+
+function qChargeTableHTML(side, rows) {
+  var color = side==='recv' ? '#0d9488' : 'var(--blue-b)';
+  return '<table style="width:100%;border-collapse:collapse;font-size:11.5px" id="q-tbl-'+side+'">' +
+    '<thead><tr>' +
+      '<th style="text-align:left;padding:5px 6px;background:var(--s2);border:1px solid var(--b1);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;min-width:160px">Charge Description</th>' +
+      '<th style="text-align:right;padding:5px 6px;background:var(--s2);border:1px solid var(--b1);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;width:80px">Rate</th>' +
+      '<th style="text-align:right;padding:5px 6px;background:var(--s2);border:1px solid var(--b1);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;width:55px">Qty</th>' +
+      '<th style="text-align:right;padding:5px 6px;background:var(--s2);border:1px solid var(--b1);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;width:85px">Total</th>' +
+      '<th style="width:20px;border:1px solid var(--b1);background:var(--s2)"></th>' +
+    '</tr></thead><tbody>' +
+    rows.map(function(r,i){
+      return '<tr id="q-'+side+'-row-'+i+'">' +
+        '<td style="padding:3px 4px;border:1px solid var(--b1)"><input list="q-charge-list" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:inherit;color:var(--t1);outline:none;padding:2px 4px" value="'+esc(r.desc||'')+'" oninput="qRowChange(\''+side+'\','+i+',\'desc\',this.value)"></td>' +
+        '<td style="padding:3px 4px;border:1px solid var(--b1)"><input type="number" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:monospace;color:var(--t1);outline:none;padding:2px 4px;text-align:right" value="'+esc(r.rate||'')+'" oninput="qRowChange(\''+side+'\','+i+',\'rate\',this.value)" placeholder="0"></td>' +
+        '<td style="padding:3px 4px;border:1px solid var(--b1)"><input type="number" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:monospace;color:var(--t1);outline:none;padding:2px 4px;text-align:right" value="'+esc(r.qty||'1')+'" oninput="qRowChange(\''+side+'\','+i+',\'qty\',this.value)" placeholder="1"></td>' +
+        '<td style="padding:3px 4px;border:1px solid var(--b1);text-align:right;font-family:monospace;font-weight:600;color:'+color+';font-size:12px" id="q-'+side+'-t-'+i+'">'+(r.total?'₹'+fmt(parseFloat(r.total)):'—')+'</td>' +
+        '<td style="padding:3px 4px;border:1px solid var(--b1);text-align:center"><span style="cursor:pointer;color:var(--t3);font-size:13px" onclick="qRemoveRow(\''+side+'\','+i+')">×</span></td>' +
+      '</tr>';
+    }).join('') +
+    '</tbody></table>' +
+    '<datalist id="q-charge-list">'+allChargeHeads().map(function(h){ return '<option value="'+h+'">'; }).join('')+'</datalist>';
 }
-function qGstFromPct() {
-  var sa = +(document.getElementById('q_sa')||{}).value||0;
-  var pct = +(document.getElementById('q_gstp')||{}).value||0;
-  var gstEl = document.getElementById('q_gst');
-  if (gstEl) gstEl.value = Math.round(sa * pct / 100);
-  qMargin();
+
+function qRowChange(side, idx, field, val) {
+  var rows = side==='recv' ? qRecvRows : qSentRows;
+  rows[idx][field] = val;
+  var rate = parseFloat(rows[idx].rate)||0;
+  var qty  = parseFloat(rows[idx].qty)||1;
+  var total = rate * qty;
+  rows[idx].total = total > 0 ? String(total) : '';
+  var tEl = document.getElementById('q-'+side+'-t-'+idx);
+  if (tEl) tEl.textContent = total > 0 ? '₹'+fmt(total) : '—';
+  qCalcTotals();
+}
+function qAddRow(side) {
+  var rows = side==='recv' ? qRecvRows : qSentRows;
+  rows.push({desc:'', rate:'', qty:'1', total:''});
+  // Rebuild just the table body efficiently
+  var tbl = document.getElementById('q-tbl-'+side);
+  if (tbl) {
+    var newRows = side==='recv' ? qRecvRows : qSentRows;
+    var tbody = tbl.querySelector('tbody');
+    var i = newRows.length-1;
+    var r = newRows[i];
+    var color = side==='recv' ? '#0d9488' : 'var(--blue-b)';
+    var tr = document.createElement('tr');
+    tr.id = 'q-'+side+'-row-'+i;
+    tr.innerHTML =
+      '<td style="padding:3px 4px;border:1px solid var(--b1)"><input list="q-charge-list" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:inherit;color:var(--t1);outline:none;padding:2px 4px" value="" oninput="qRowChange(\''+side+'\','+i+',\'desc\',this.value)"></td>' +
+      '<td style="padding:3px 4px;border:1px solid var(--b1)"><input type="number" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:monospace;color:var(--t1);outline:none;padding:2px 4px;text-align:right" value="" oninput="qRowChange(\''+side+'\','+i+',\'rate\',this.value)" placeholder="0"></td>' +
+      '<td style="padding:3px 4px;border:1px solid var(--b1)"><input type="number" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:monospace;color:var(--t1);outline:none;padding:2px 4px;text-align:right" value="1" oninput="qRowChange(\''+side+'\','+i+',\'qty\',this.value)" placeholder="1"></td>' +
+      '<td style="padding:3px 4px;border:1px solid var(--b1);text-align:right;font-family:monospace;font-weight:600;color:'+color+';font-size:12px" id="q-'+side+'-t-'+i+'">—</td>' +
+      '<td style="padding:3px 4px;border:1px solid var(--b1);text-align:center"><span style="cursor:pointer;color:var(--t3);font-size:13px" onclick="qRemoveRow(\''+side+'\','+i+')">×</span></td>';
+    tbody.appendChild(tr);
+  }
+}
+function qRemoveRow(side, idx) {
+  var rows = side==='recv' ? qRecvRows : qSentRows;
+  if (rows.length <= 1) { toast('Keep at least one row','err'); return; }
+  rows.splice(idx, 1);
+  // Rebuild table
+  buildQuotFormCharges();
+  qCalcTotals();
+}
+function buildQuotFormCharges() {
+  // Re-render both tables in place (called after row removal)
+  ['recv','sent'].forEach(function(side){
+    var tbl = document.getElementById('q-tbl-'+side);
+    if (!tbl) return;
+    var rows = side==='recv' ? qRecvRows : qSentRows;
+    var color = side==='recv' ? '#0d9488' : 'var(--blue-b)';
+    tbl.querySelector('tbody').innerHTML = rows.map(function(r,i){
+      return '<tr id="q-'+side+'-row-'+i+'">' +
+        '<td style="padding:3px 4px;border:1px solid var(--b1)"><input list="q-charge-list" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:inherit;color:var(--t1);outline:none;padding:2px 4px" value="'+esc(r.desc||'')+'" oninput="qRowChange(\''+side+'\','+i+',\'desc\',this.value)"></td>' +
+        '<td style="padding:3px 4px;border:1px solid var(--b1)"><input type="number" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:monospace;color:var(--t1);outline:none;padding:2px 4px;text-align:right" value="'+esc(r.rate||'')+'" oninput="qRowChange(\''+side+'\','+i+',\'rate\',this.value)" placeholder="0"></td>' +
+        '<td style="padding:3px 4px;border:1px solid var(--b1)"><input type="number" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:monospace;color:var(--t1);outline:none;padding:2px 4px;text-align:right" value="'+esc(r.qty||'1')+'" oninput="qRowChange(\''+side+'\','+i+',\'qty\',this.value)" placeholder="1"></td>' +
+        '<td style="padding:3px 4px;border:1px solid var(--b1);text-align:right;font-family:monospace;font-weight:600;color:'+color+';font-size:12px" id="q-'+side+'-t-'+i+'">'+(r.total&&parseFloat(r.total)>0?'₹'+fmt(parseFloat(r.total)):'—')+'</td>' +
+        '<td style="padding:3px 4px;border:1px solid var(--b1);text-align:center"><span style="cursor:pointer;color:var(--t3);font-size:13px" onclick="qRemoveRow(\''+side+'\','+i+')">×</span></td>' +
+      '</tr>';
+    }).join('');
+  });
+}
+function qCalcTotals() {
+  var buyTotal = qRecvRows.reduce(function(a,r){ return a+(parseFloat(r.total)||0); },0);
+  var sellTotal = qSentRows.reduce(function(a,r){ return a+(parseFloat(r.total)||0); },0);
+  var margin = sellTotal - buyTotal;
+  var mpct = buyTotal > 0 ? Math.round(margin/buyTotal*100) : 0;
+  var rEl = document.getElementById('q-recv-total');
+  var sEl = document.getElementById('q-sent-total');
+  if (rEl) rEl.textContent = '₹'+fmt(buyTotal);
+  if (sEl) sEl.textContent = '₹'+fmt(sellTotal);
+  var strip = document.getElementById('q-margin-strip');
+  if (strip) {
+    strip.innerHTML =
+      '<div><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:3px">Buy Cost</div><div class="mono" style="font-size:16px;font-weight:700;color:var(--t1)">₹'+fmt(buyTotal)+'</div></div>' +
+      '<div><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:3px">Sell Amount</div><div class="mono" style="font-size:16px;font-weight:700;color:var(--blue-b)">₹'+fmt(sellTotal)+'</div></div>' +
+      '<div><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:3px">Margin</div><div class="mono" style="font-size:16px;font-weight:700;color:'+(margin>=0?'var(--green-b)':'var(--red-b)')+'">₹'+fmt(Math.abs(margin))+' '+(margin>=0?'▲':'▼')+'</div></div>' +
+      '<div><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:3px">Margin %</div><div class="mono" style="font-size:16px;font-weight:700;color:'+(mpct>=0?'var(--green-b)':'var(--red-b)')+'">'+mpct+'%</div></div>';
+  }
 }
 async function saveQuot() {
   var qDate = (document.getElementById('q_dt')||{}).value || '';
-  var qBuy = (document.getElementById('q_bc')||{}).value || '';
-  var qSell = (document.getElementById('q_sa')||{}).value || '';
-  var qGst = (document.getElementById('q_gst')||{}).value || '';
   var qUnits = (document.getElementById('q_units')||{}).value || '';
   var qJn = (document.getElementById('q_jn')||{}).value || '';
+  var buyTotal = qRecvRows.reduce(function(a,r){ return a+(parseFloat(r.total)||0); },0);
+  var sellTotal = qSentRows.reduce(function(a,r){ return a+(parseFloat(r.total)||0); },0);
   var d = {
     quote_number: (document.getElementById('q_qn')||{}).value,
     date: qDate ? qDate : null,
@@ -2272,13 +2611,15 @@ async function saveQuot() {
     origin: (document.getElementById('q_or')||{}).value,
     destination: (document.getElementById('q_ds')||{}).value,
     mode: (document.getElementById('q_md')||{}).value,
-    buy_cost: qBuy === '' ? 0 : Number(qBuy),
-    sell_amount: qSell === '' ? 0 : Number(qSell),
-    gst_amount: qGst === '' ? 0 : Number(qGst),
     units: qUnits === '' ? 0 : Number(qUnits),
-    gst_pct: +(document.getElementById('q_gstp')||{}).value||18,
+    chargeable_weight: (document.getElementById('q_cwt')||{}).value === '' ? null : Number((document.getElementById('q_cwt')||{}).value),
     status: (document.getElementById('q_st')||{}).value,
-    notes: (document.getElementById('q_nt')||{}).value
+    notes: (document.getElementById('q_nt')||{}).value,
+    recv_charges: qRecvRows.map(function(r){ return {desc:r.desc,rate:r.rate,qty:r.qty,total:r.total}; }),
+    sent_charges: qSentRows.map(function(r){ return {desc:r.desc,rate:r.rate,qty:r.qty,total:r.total}; }),
+    buy_cost: buyTotal,
+    sell_amount: sellTotal,
+    charges: [] // keep legacy field
   };
   if (!d.customer_name) { toast('Customer required','err'); return; }
   try {
@@ -2915,6 +3256,17 @@ function openBillDet(sid) {
   if (!body) return;
   document.getElementById('mo-billdet').querySelector('.mo-title').textContent = 'Billing Details — ' + (s.job_number||'');
   body.innerHTML = renderBillingDetailContent(s);
+  // Inject "View Quotation" button if a linked quotation exists
+  var linkedQuot = DB.quots.find(function(q){ return q.job_number === s.job_number; });
+  if (linkedQuot) {
+    var qBtnWrap = document.createElement('div');
+    qBtnWrap.style.cssText = 'margin-bottom:12px;padding:10px 14px;background:var(--blue-l);border:1px solid var(--blue);border-radius:6px;display:flex;align-items:center;gap:10px';
+    qBtnWrap.innerHTML =
+      '<span style="font-size:12px;font-weight:600;color:var(--blue-b)">📋 Quotation linked: '+esc(linkedQuot.quote_number||'—')+'</span>' +
+      '<span style="font-size:11px;color:var(--t3)">Buy: ₹'+fmt(+(linkedQuot.buy_cost)||0)+' · Sell: ₹'+fmt(+(linkedQuot.sell_amount)||0)+'</span>' +
+      '<button class="btn btn-sm btn-bl" style="margin-left:auto" onclick="closeMo(\'mo-billdet\');viewQuot(\''+linkedQuot.id+'\')">👁 View All Charges</button>';
+    body.insertBefore(qBtnWrap, body.firstChild);
+  }
   var editBtn = document.getElementById('billdet-edit-btn');
   if (editBtn) editBtn.onclick = function(){ closeMo('mo-billdet'); openBillModal(s.id); };
   openMo('mo-billdet');
