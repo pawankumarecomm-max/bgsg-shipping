@@ -400,6 +400,12 @@ tr.row-intransit td:first-child { border-left: 3px solid var(--amber); }
 .fb input:focus,.fb select:focus,.fi:focus{box-shadow:0 0 0 3px rgba(37,91,155,.10)}
 .card-h .btn{background:#fff}
 .card-h .btn:hover{background:#f8fbff}
+tr.ship-row-selected td{background:#dfeafb !important;outline:none}
+tr.ship-row-selected:hover td{background:#cde0f7 !important}
+#ship-bulk-bar{animation:slideDown .15s ease}
+@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+input[type="checkbox"].ship-chk{cursor:pointer;width:14px;height:14px;accent-color:var(--blue)}
+#ship-chk-all{cursor:pointer;width:14px;height:14px;accent-color:var(--blue)}
 
 </style>
 </head>
@@ -535,10 +541,20 @@ tr.row-intransit td:first-child { border-left: 3px solid var(--amber); }
         <select id="sf-pod"><option value="">All POD</option><option>POD Pending</option><option>Delivered</option><option>POD Received</option></select>
         <select id="sf-bill"><option value="">All Billing</option><option>Unbilled</option><option>Billed</option></select>
         <select id="sf-pay"><option value="">All Payment</option><option>Pending</option><option>Received</option></select>
+        <select id="sf-cust" style="min-width:130px"><option value="">All Customers</option></select>
         <input type="date" id="sf-from" title="From date">
         <input type="date" id="sf-to" title="To date">
         <button class="btn btn-sm" onclick="clearFilters()">✕ Clear</button>
         <span class="fc" id="ship-count"></span>
+      </div>
+      <!-- Bulk Action Bar (hidden by default) -->
+      <div id="ship-bulk-bar" style="display:none;background:var(--blue-l);border:1px solid var(--blue);border-radius:var(--r);padding:8px 14px;margin-bottom:10px;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:12px;font-weight:700;color:var(--blue-b)"><span id="ship-sel-count">0</span> selected</span>
+        <button class="btn btn-sm btn-bl" onclick="viewSelectedOnly()">👁 View Selected</button>
+        <button class="btn btn-sm btn-bl" onclick="exportSelectedCSV()">⬇ Export Selected</button>
+        <button class="btn btn-sm btn-am" onclick="bulkMarkBilled()">🧾 Mark as Billed</button>
+        <span id="ship-view-sel-indicator" style="display:none;font-size:11px;color:var(--blue-b);font-weight:600;background:var(--blue);color:#fff;padding:2px 8px;border-radius:10px">Filtered to selected only</span>
+        <button class="btn btn-sm btn-rd" onclick="clearShipSelection()" style="margin-left:auto">✕ Clear Selection</button>
       </div>
       <div class="card">
         <div class="tw"><table id="shipments-table"><thead id="ship-th"></thead><tbody id="ship-tb"></tbody></table></div>
@@ -1537,14 +1553,17 @@ function renderShips() {
   var pod = document.getElementById('sf-pod').value || '';
   var bill = document.getElementById('sf-bill').value || '';
   var pay = document.getElementById('sf-pay').value || '';
+  var custF = (document.getElementById('sf-cust')||{}).value || '';
   var from = document.getElementById('sf-from').value || '';
   var to = document.getElementById('sf-to').value || '';
   var today = new Date().toISOString().slice(0,10);
 
   var data = DB.ships.filter(function(s) {
+    if (viewSelOnly && selectedShips.indexOf(s.id) < 0) return false;
     if (q && !(s.job_number+' '+s.customer_name+' '+(s.invoice_number||'')+' '+(s.consignee_name||'')+' '+(s.pol||'')+' '+(s.pod||'')+' '+(s.commodity||'')).toLowerCase().includes(q)) return false;
     if (type && s.shipment_type !== type) return false;
     if (mode && s.mode !== mode) return false;
+    if (custF && s.customer_name !== custF) return false;
     if (stage) {
       if (stage === 'intransit') {
         if (!isShipInTransit(s)) return false;
@@ -1572,31 +1591,44 @@ function renderShips() {
 
   var H = ['job_number','customer_name','shipment_date','invoice_number','consignee_name','pol','pod','mode','commodity','eta','current_stage','invoice_currency','billing_status'];
   var HL = ['Job Number','Customer Name','Invoice Date','Commercial Invoice','Consignee','Origin','Destination','Mode','SKU','ETA','Status','Currency','Billing'];
-  document.getElementById('ship-th').innerHTML = '<tr>' + H.map(function(h,i){
-    return '<th onclick="setSort(\''+h+'\')">' + HL[i] + (sSort===h?(sDir==='asc'?' ▲':' ▼'):'') + '</th>';
-  }).join('') + '</tr>';
+
+  // Populate customer filter
+  var custSel = document.getElementById('sf-cust');
+  if (custSel) {
+    var curCust = custSel.value;
+    var custList = Array.from(new Set(DB.ships.map(function(s){return s.customer_name;}).filter(Boolean))).sort();
+    custSel.innerHTML = '<option value="">All Customers</option>' + custList.map(function(c){ return '<option'+(c===curCust?' selected':'')+'>'+c+'</option>'; }).join('');
+  }
+
+  document.getElementById('ship-th').innerHTML = '<tr>' +
+    '<th style="width:32px;text-align:center"><input type="checkbox" id="ship-chk-all" onclick="toggleAllShips(this)" title="Select all"></th>' +
+    H.map(function(h,i){
+      return '<th onclick="setSort(\''+h+'\')">' + HL[i] + (sSort===h?(sDir==='asc'?' ▲':' ▼'):'') + '</th>';
+    }).join('') + '</tr>';
 
   document.getElementById('ship-tb').innerHTML = slice.length ? slice.map(function(s) {
     var isTransit = isShipInTransit(s);
     var rowCls = 'cr' + (isTransit ? ' row-intransit' : '');
     var statusTxt = shipStatusLabel(s);
     var statusCls = shipStatusClass(s);
-    return '<tr class="'+rowCls+'" onclick="openDet(\''+s.id+'\')">'+
-      '<td><span class="mono ship-cell-ell" style="color:var(--green-b);font-weight:700" title="'+esc(s.job_number||'')+'">'+(s.job_number||'—')+'</span></td>'+
-      '<td><span class="ship-cell-ell" style="font-weight:600" title="'+esc(s.customer_name||'')+'">'+(s.customer_name||'—')+'</span></td>'+
-      '<td class="mono">'+(s.shipment_date||'—')+'</td>'+
-      '<td class="mono"><span class="ship-cell-ell" title="'+esc(s.invoice_number||'')+'">'+(s.invoice_number||'—')+'</span></td>'+
-      '<td><span class="ship-cell-ell" title="'+esc(s.consignee_name||'')+'">'+(s.consignee_name||'—')+'</span></td>'+
-      '<td><span class="ship-cell-ell" title="'+esc(s.pol||'')+'">'+(s.pol||'—')+'</span></td>'+
-      '<td><span class="ship-cell-ell" title="'+esc(s.pod||'')+'">'+(s.pod||'—')+'</span></td>'+
-      '<td>'+modeTag(s.mode)+'</td>'+
-      '<td><span class="ship-cell-ell" title="'+esc(s.commodity||'')+'">'+(s.commodity||'—')+'</span></td>'+
-      '<td class="mono" style="'+(s.eta&&s.eta<today?'color:var(--red-b)':'')+'">'+(s.eta||'—')+'</td>'+
-      '<td class="ship-status-cell '+statusCls+'">'+statusTxt+'</td>'+
-      '<td>'+(s.invoice_currency?'<span class="cur-badge cur-'+String(s.invoice_currency).toLowerCase()+'">'+s.invoice_currency+'</span>':'—')+'</td>'+
-      '<td>'+bbadge(s.billing_status)+'</td>'+
+    var isSelected = selectedShips.indexOf(s.id) >= 0;
+    return '<tr class="'+rowCls+(isSelected?' ship-row-selected':'')+'" data-id="'+s.id+'">'+
+      '<td onclick="event.stopPropagation()" style="text-align:center;width:32px"><input type="checkbox" class="ship-chk" value="'+s.id+'" '+(isSelected?'checked':'')+' onclick="toggleShipSel(this)"></td>'+
+      '<td onclick="openDet(\''+s.id+'\')"><span class="mono ship-cell-ell" style="color:var(--green-b);font-weight:700" title="'+esc(s.job_number||'')+'">'+(s.job_number||'—')+'</span></td>'+
+      '<td onclick="openDet(\''+s.id+'\')"><span class="ship-cell-ell" style="font-weight:600" title="'+esc(s.customer_name||'')+'">'+(s.customer_name||'—')+'</span></td>'+
+      '<td onclick="openDet(\''+s.id+'\')" class="mono">'+(s.shipment_date||'—')+'</td>'+
+      '<td onclick="openDet(\''+s.id+'\')" class="mono"><span class="ship-cell-ell" title="'+esc(s.invoice_number||'')+'">'+(s.invoice_number||'—')+'</span></td>'+
+      '<td onclick="openDet(\''+s.id+'\')"><span class="ship-cell-ell" title="'+esc(s.consignee_name||'')+'">'+(s.consignee_name||'—')+'</span></td>'+
+      '<td onclick="openDet(\''+s.id+'\')"><span class="ship-cell-ell" title="'+esc(s.pol||'')+'">'+(s.pol||'—')+'</span></td>'+
+      '<td onclick="openDet(\''+s.id+'\')"><span class="ship-cell-ell" title="'+esc(s.pod||'')+'">'+(s.pod||'—')+'</span></td>'+
+      '<td onclick="openDet(\''+s.id+'\')">'+modeTag(s.mode)+'</td>'+
+      '<td onclick="openDet(\''+s.id+'\')"><span class="ship-cell-ell" title="'+esc(s.commodity||'')+'">'+(s.commodity||'—')+'</span></td>'+
+      '<td onclick="openDet(\''+s.id+'\')" class="mono" style="'+(s.eta&&s.eta<today?'color:var(--red-b)':'')+'">'+(s.eta||'—')+'</td>'+
+      '<td onclick="openDet(\''+s.id+'\')" class="ship-status-cell '+statusCls+'">'+statusTxt+'</td>'+
+      '<td onclick="openDet(\''+s.id+'\')">'+(s.invoice_currency?'<span class="cur-badge cur-'+String(s.invoice_currency).toLowerCase()+'">'+s.invoice_currency+'</span>':'—')+'</td>'+
+      '<td onclick="openDet(\''+s.id+'\')">'+bbadge(s.billing_status)+'</td>'+
       '</tr>';
-  }).join('') : '<tr><td colspan="13" class="t-empty">No shipments found</td></tr>';
+  }).join('') : '<tr><td colspan="14" class="t-empty">No shipments found</td></tr>';
 
   var pg = '<span>'+data.length+' records · Page '+sPage+'/'+pages+'</span>';
   if (sPage > 1) pg += '<div class="pgn-n" onclick="sPage--;renderShips()">‹</div>';
@@ -1609,10 +1641,94 @@ function renderShips() {
 
 function setSort(c) { if(sSort===c){ sDir=sDir==='asc'?'desc':'asc'; } else { sSort=c; sDir='asc'; } renderShips(); }
 function clearFilters() {
-  ['sf-q','sf-type','sf-mode','sf-stage','sf-pod','sf-bill','sf-pay','sf-from','sf-to'].forEach(function(id){
+  ['sf-q','sf-type','sf-mode','sf-stage','sf-pod','sf-bill','sf-pay','sf-from','sf-to','sf-cust'].forEach(function(id){
     var el = document.getElementById(id); if(el) el.value = '';
   });
   renderShips();
+}
+
+// ── SHIPMENT SELECTION ─────────────────────────────────────
+var selectedShips = [];
+var viewSelOnly = false;
+function toggleShipSel(chk) {
+  var id = chk.value;
+  var row = chk.closest('tr');
+  if (chk.checked) {
+    if (selectedShips.indexOf(id) < 0) selectedShips.push(id);
+    if (row) row.classList.add('ship-row-selected');
+  } else {
+    selectedShips = selectedShips.filter(function(x){ return x !== id; });
+    if (row) row.classList.remove('ship-row-selected');
+  }
+  updateShipBulkBar();
+}
+function toggleAllShips(chk) {
+  var boxes = document.querySelectorAll('.ship-chk');
+  boxes.forEach(function(b){
+    b.checked = chk.checked;
+    var row = b.closest('tr');
+    if (chk.checked) {
+      if (selectedShips.indexOf(b.value) < 0) selectedShips.push(b.value);
+      if (row) row.classList.add('ship-row-selected');
+    } else {
+      selectedShips = selectedShips.filter(function(x){ return x !== b.value; });
+      if (row) row.classList.remove('ship-row-selected');
+    }
+  });
+  updateShipBulkBar();
+}
+function clearShipSelection() {
+  selectedShips = [];
+  viewSelOnly = false;
+  document.querySelectorAll('.ship-chk').forEach(function(b){ b.checked = false; var r=b.closest('tr'); if(r) r.classList.remove('ship-row-selected'); });
+  var ca = document.getElementById('ship-chk-all'); if(ca) ca.checked = false;
+  updateShipBulkBar();
+  renderShips();
+}
+function viewSelectedOnly() {
+  if (!selectedShips.length) { toast('No rows selected','err'); return; }
+  viewSelOnly = !viewSelOnly;
+  var ind = document.getElementById('ship-view-sel-indicator');
+  if (ind) ind.style.display = viewSelOnly ? 'inline-block' : 'none';
+  renderShips();
+}
+function updateShipBulkBar() {
+  var bar = document.getElementById('ship-bulk-bar');
+  var cnt = document.getElementById('ship-sel-count');
+  if (!bar) return;
+  if (selectedShips.length > 0) {
+    bar.style.display = 'flex';
+    if (cnt) cnt.textContent = selectedShips.length;
+  } else {
+    bar.style.display = 'none';
+    viewSelOnly = false;
+    var ind = document.getElementById('ship-view-sel-indicator');
+    if (ind) ind.style.display = 'none';
+  }
+}
+function exportSelectedCSV() {
+  var sel = DB.ships.filter(function(s){ return selectedShips.indexOf(s.id) >= 0; });
+  if (!sel.length) { toast('No rows selected','err'); return; }
+  var H = ['Job Number','Customer Name','Date of Invoice','Commercial Invoice','Consignee','Origin','Destination','Transport Mode','SKU Details','ETA','Status','Billing Status'];
+  var rows = sel.map(function(s) {
+    return [s.job_number,s.customer_name,s.shipment_date,s.invoice_number,s.consignee_name,s.pol,s.pod,s.mode,s.commodity,s.eta,shipStatusLabel(s),s.billing_status];
+  });
+  var csv = [H].concat(rows).map(function(r){ return r.map(function(c){ return '"'+(c||'')+'"'; }).join(','); }).join('\n');
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download = 'BGSG_Selected_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  toast('Exported '+sel.length+' rows ✓','ok');
+}
+function bulkMarkBilled() {
+  if (!selectedShips.length) { toast('No rows selected','err'); return; }
+  if (!confirm('Mark '+selectedShips.length+' shipment(s) as Billed?')) return;
+  var updates = selectedShips.map(function(id){
+    var s = DB.ships.find(function(x){return x.id===id;});
+    if (s) { s.billing_status = 'Billed'; return saveSingle(s); }
+    return Promise.resolve();
+  });
+  Promise.all(updates).then(function(){ toast('Marked '+selectedShips.length+' as Billed ✓','ok'); clearShipSelection(); renderShips(); });
 }
 function dashboardKpiClick(key) {
   clearFilters();
@@ -3015,7 +3131,7 @@ function renderBillMain() {
   el.innerHTML =
     '<thead>' +
     '<tr style="background:var(--s2)">' +
-      '<td colspan="10" style="padding:8px 12px">' +
+      '<td colspan="12" style="padding:8px 12px">' +
         '<div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">' +
           '<span style="font-size:11px"><span style="color:var(--t3)">Logi: </span><span class="mono" style="font-weight:700;color:var(--green-b)">₹'+fmt(totalLogi)+'</span><span style="font-size:10px;color:var(--t3)"> · Rcvd ₹'+fmt(receivedLogi)+' · Pending ₹'+fmt(totalLogi-receivedLogi)+'</span></span>' +
           '<span style="font-size:11px"><span style="color:var(--t3)">Vendor: </span><span class="mono" style="font-weight:700;color:var(--amber-b)">₹'+fmt(totalVendor)+'</span><span style="font-size:10px;color:var(--t3)"> · Paid ₹'+fmt(paidVendor)+' · Unpaid ₹'+fmt(totalVendor-paidVendor)+'</span></span>' +
@@ -3023,15 +3139,17 @@ function renderBillMain() {
       '</td>' +
     '</tr>' +
     '<tr>' +
-      '<th style="min-width:100px">Job No.</th>' +
-      '<th style="min-width:110px">Customer</th>' +
-      '<th style="min-width:80px">Status</th>' +
-      '<th style="min-width:110px">Ship. Status</th>' +
-      '<th style="min-width:130px">Invoices <span style="font-weight:400;font-size:9px;color:var(--t3)">(you → cust)</span></th>' +
-      '<th style="min-width:110px">Invoice Value</th>' +
-      '<th style="min-width:100px">Logi Status</th>' +
-      '<th style="min-width:110px">Vendor</th>' +
-      '<th style="min-width:90px">Vendor Amt</th>' +
+      '<th style="min-width:90px">Job No.</th>' +
+      '<th style="min-width:110px">Comm. Invoice No.</th>' +
+      '<th style="min-width:110px">Route</th>' +
+      '<th style="min-width:90px">Ship. Status</th>' +
+      '<th style="min-width:75px">Status</th>' +
+      '<th style="min-width:110px">Logi Invoice No.</th>' +
+      '<th style="min-width:90px">Inv. Value</th>' +
+      '<th style="min-width:90px">Payment St.</th>' +
+      '<th style="min-width:110px">Vendor Inv. No.</th>' +
+      '<th style="min-width:80px">Inv. Amount</th>' +
+      '<th style="min-width:85px">Vendor Pay.</th>' +
       '<th></th>' +
     '</tr>' +
     '</thead>' +
@@ -3090,23 +3208,52 @@ function renderBillMain() {
       // Warn icon for delivered+unbilled — REMOVED per user request
       var warnIcon = '';
 
+      // Route display
+      var routeDisplay = ((s.pol||'') && (s.pod||'')) ? (s.pol + ' → ' + s.pod) : (s.pol || s.pod || '<span style="color:var(--t3)">—</span>');
+
+      // Vendor invoice number display
+      var vendorInvDisplay = s.vendor_invoice_no
+        ? '<span class="mono" style="font-size:11px;font-weight:600;color:var(--amber-b)">'+esc(s.vendor_invoice_no)+'</span>'
+        : '<span style="color:var(--t3)">—</span>';
+
+      // Vendor payment status badge
+      var vendorPayStatus = vendorPaid
+        ? '<span class="badge b-gr" style="font-size:10px">✓ Paid</span>'
+        : (vendorAmt > 0 || dutyAmt > 0
+            ? '<span class="badge b-am" style="font-size:10px">Unpaid</span>'
+            : '<span class="badge b-gy" style="font-size:10px">—</span>');
+
+      // Customer payment status badge
+      var custPayStatus = s.payment_status === 'Received'
+        ? '<span class="badge b-gr" style="font-size:10px">✓ Received</span>'
+        : (logiAmt > 0
+            ? '<span class="badge b-rd" style="font-size:10px">Pending</span>'
+            : '<span class="badge b-gy" style="font-size:10px">—</span>');
+
+      // Logistics Invoice No — only show when billed (has cust_invoice_no)
+      var logiInvDisplay = s.billing_status === 'Billed' && (s.cust_invoice_no || s.invoice_number)
+        ? '<span class="mono" style="font-size:11px;font-weight:600;color:var(--blue-b)">'+(s.cust_invoice_no || s.invoice_number)+'</span>'
+        : '<span style="color:var(--t3)">—</span>';
+
       // Build row — each td gets the background style so hover can't override
       return '<tr class="cr" onclick="openBillDet(\''+s.id+'\')">' +
-        '<td'+tdStyle+'><div class="mono" style="color:var(--green-b);font-weight:700;font-size:11px">'+s.job_number+warnIcon+'</div><div style="font-size:10px;color:var(--t3)">'+(s.invoice_number||'')+'</div></td>' +
-        '<td'+tdStyle+' style="'+(tdBg?tdBg+';':'')+' font-weight:600;font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis">'+s.customer_name+'</td>' +
-        '<td'+tdStyle+'>'+billBadge+'</td>' +
+        '<td'+tdStyle+'><div class="mono" style="color:var(--green-b);font-weight:700;font-size:11px">'+s.job_number+warnIcon+'</div><div style="font-size:10px;color:var(--t3)">'+(s.customer_name||'')+'</div></td>' +
+        '<td'+tdStyle+' class="mono" style="'+(tdBg?tdBg+';':'')+' font-size:11px;font-weight:600">'+(logiInv||'<span style="color:var(--t3);font-family:inherit;font-weight:400">—</span>')+'</td>' +
+        '<td'+tdStyle+' style="'+(tdBg?tdBg+';':'')+' font-size:11px;color:var(--t2)">'+routeDisplay+'</td>' +
         '<td'+tdStyle+'><span class="badge '+shipSt.badge+'" style="font-size:10px">'+shipSt.lbl+'</span></td>' +
-        '<td'+tdStyle+' class="mono" style="'+(tdBg?tdBg+';':'')+' font-size:11px;font-weight:600">'+(logiInv||'<span style="font-size:11px;color:var(--t3);font-family:inherit;font-weight:400">Not raised</span>')+'</td>' +
+        '<td'+tdStyle+'>'+billBadge+'</td>' +
+        '<td'+tdStyle+'>'+logiInvDisplay+'</td>' +
         '<td'+tdStyle+'>'+invValueDisplay+'</td>' +
-        '<td'+tdStyle+'>'+logiStatus+'</td>' +
-        '<td'+tdStyle+' style="'+(tdBg?tdBg+';':'')+' font-size:11px;color:var(--t2);max-width:120px;overflow:hidden;text-overflow:ellipsis">'+(s.vendor_name||'<span style="color:var(--t3)">—</span>')+'<br>'+vendorStatus+'</td>' +
+        '<td'+tdStyle+'>'+custPayStatus+'</td>' +
+        '<td'+tdStyle+'>'+vendorInvDisplay+'</td>' +
         '<td'+tdStyle+'>'+vendorAmtDisplay+'</td>' +
+        '<td'+tdStyle+'>'+vendorPayStatus+'</td>' +
         '<td'+tdStyle+' onclick="event.stopPropagation()" style="'+(tdBg?tdBg+';':'')+' white-space:nowrap">' +
           '<button class="btn btn-xs btn-bl" style="margin-bottom:3px" onclick="openBillModal(\''+s.id+'\')">✏ Edit</button><br>' +
           (!vendorPaid && (vendorAmt>0||dutyAmt>0) ? '<button class="btn btn-xs" onclick="markVendorPaid(\''+s.id+'\')">Mark V.Paid</button>' : '') +
         '</td>' +
       '</tr>';
-    }).join('') : '<tr><td colspan="10" class="t-empty">No shipments found</td></tr>') +
+    }).join('') : '<tr><td colspan="12" class="t-empty">No shipments found</td></tr>') +
     '</tbody>';
 }
 // Extra invoices modal
