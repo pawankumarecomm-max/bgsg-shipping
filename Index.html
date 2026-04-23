@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BGSG Freight Pro</title>
+<title>BGSG Logistics</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
@@ -782,7 +782,7 @@ input[type="checkbox"].ship-chk{cursor:pointer;width:14px;height:14px;accent-col
   <div class="mo-box lg" style="max-width:1100px">
     <div class="mo-head"><div class="mo-title" id="mo-qv-title">Quotation Detail</div><button class="mo-x" onclick="closeMo('mo-quot-view')">×</button></div>
     <div class="mo-body" style="padding:14px" id="quot-view-body"></div>
-    <div class="mo-foot"><button class="btn" onclick="closeMo('mo-quot-view')">Close</button></div>
+    <div class="mo-foot"><button class="btn btn-bl" onclick="exportQuotPDF()">📄 Export PDF</button><button class="btn" onclick="closeMo('mo-quot-view')">Close</button></div>
   </div>
 </div>
 <div class="mo" id="mo-bill">
@@ -2299,6 +2299,7 @@ function confirmDel() {
 }
 
 // ── QUOTATIONS ────────────────────────────────────────────
+var viewQuotId = null;
 function clearQuotFilters() {
   ['qf-q','qf-st','qf-mode','qf-from','qf-to'].forEach(function(id){
     var el = document.getElementById(id); if(el) el.value='';
@@ -2514,12 +2515,18 @@ function editQuotFn(id) {
 function viewQuot(id) {
   var q = DB.quots.find(function(x){ return x.id===id; });
   if (!q) return;
+  viewQuotId = id;
   var recv = q.recv_charges || [];
   var sent = q.sent_charges || [];
   var buyCost = recv.reduce(function(a,r){ return a+(parseFloat(r.total)||0); },0);
   var sellAmt = sent.reduce(function(a,r){ return a+(parseFloat(r.total)||0); },0);
   var margin = sellAmt - buyCost;
-  function chargeTable(rows, color, title) {
+  var qCur = q.currency || 'INR';
+  var qEx = parseFloat(q.exchange_rate)||0;
+  var expSym = {INR:'₹',USD:'$',EUR:'€',GBP:'£'}[qCur]||'₹';
+  var showConv = (qCur !== 'INR' && qEx > 0);
+  // chargeTable: isSent=true adds the foreign currency conversion column
+  function chargeTable(rows, color, title, isSent) {
     return '<div style="flex:1;min-width:0">' +
       '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:'+color+';margin-bottom:8px;padding:6px 10px;background:'+color+'18;border-radius:4px">'+title+'</div>' +
       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
@@ -2528,6 +2535,7 @@ function viewQuot(id) {
           '<th style="text-align:right;padding:6px 8px;background:var(--s2);border:1px solid var(--b1);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Rate (INR)</th>' +
           '<th style="text-align:right;padding:6px 8px;background:var(--s2);border:1px solid var(--b1);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Qty</th>' +
           '<th style="text-align:right;padding:6px 8px;background:var(--s2);border:1px solid var(--b1);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Total (INR)</th>' +
+          (isSent&&showConv ? '<th style="text-align:right;padding:6px 8px;background:#dbeafe;border:1px solid #93c5fd;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#1e40af">≈ '+qCur+' (export)</th>' : '') +
         '</tr></thead><tbody>' +
         rows.map(function(r){
           var t = parseFloat(r.total)||0;
@@ -2537,10 +2545,13 @@ function viewQuot(id) {
             '<td style="padding:6px 8px;border:1px solid var(--b1);text-align:right;font-family:monospace">'+(isEmpty?'<span style="color:var(--t3)">-</span>':fmt(parseFloat(r.rate)||0))+'</td>' +
             '<td style="padding:6px 8px;border:1px solid var(--b1);text-align:right;font-family:monospace">'+(r.qty||1)+'</td>' +
             '<td style="padding:6px 8px;border:1px solid var(--b1);text-align:right;font-family:monospace;font-weight:600;color:'+(isEmpty?'var(--t3)':t>0?color:'var(--t1)')+'>'+(isEmpty?'-':'₹'+fmt(t))+'</td>' +
+            (isSent&&showConv ? '<td style="padding:6px 8px;border:1px solid #bfdbfe;background:#eff6ff;text-align:right;font-family:monospace;font-weight:600;color:#1e40af;font-size:11px">'+(isEmpty||!t?'-':expSym+fmt(Math.round(t/qEx)))+'</td>' : '') +
           '</tr>';
         }).join('') +
         '<tr style="background:var(--s2)"><td colspan="3" style="padding:7px 8px;border:1px solid var(--b1);font-weight:700;font-size:12px">TOTAL</td>' +
-        '<td style="padding:7px 8px;border:1px solid var(--b1);text-align:right;font-family:monospace;font-weight:700;font-size:14px;color:'+color+'">₹'+fmt(rows.reduce(function(a,r){return a+(parseFloat(r.total)||0);},0))+'</td></tr>' +
+        '<td style="padding:7px 8px;border:1px solid var(--b1);text-align:right;font-family:monospace;font-weight:700;font-size:14px;color:'+color+'">₹'+fmt(rows.reduce(function(a,r){return a+(parseFloat(r.total)||0);},0))+'</td>' +
+        (isSent&&showConv ? '<td style="padding:7px 8px;border:1px solid #bfdbfe;background:#dbeafe;text-align:right;font-family:monospace;font-weight:700;font-size:14px;color:#1d4ed8">'+expSym+fmt(Math.round(rows.reduce(function(a,r){return a+(parseFloat(r.total)||0);},0)/qEx))+'</td>' : '') +
+        '</tr>' +
       '</tbody></table></div>';
   }
   document.getElementById('mo-qv-title').textContent = (q.quote_number||'Quotation')+' — '+(q.customer_name||'');
@@ -2550,15 +2561,17 @@ function viewQuot(id) {
       '<span style="font-size:12px;color:var(--t2)">📍 '+(q.origin||'—')+' → '+(q.destination||'—')+'</span>' +
       '<span style="font-size:12px;color:var(--t2)">'+modeTag(q.mode)+'</span>' +
       qsbadge(q.status) +
+      (showConv ? '<span class="cur-badge cur-'+(qCur.toLowerCase())+'" style="font-size:11px">Export: '+qCur+' @ ₹'+qEx+'</span>' : '') +
     '</div>' +
     '<div style="display:flex;gap:14px;margin-bottom:14px">' +
-      chargeTable(recv,'var(--teal-b,#0f766e)','📥 Received (Vendor / Buy Cost)') +
-      chargeTable(sent,'var(--blue-b)','📤 Sent (Customer / Sell Amount)') +
+      chargeTable(recv,'var(--teal-b,#0f766e)','📥 Received (Vendor / Buy Cost)', false) +
+      chargeTable(sent,'var(--blue-b)','📤 Sent (Customer / Sell Amount)', true) +
     '</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:12px">' +
-      '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:4px">Buy Cost</div><div class="mono" style="font-size:18px;font-weight:700;color:var(--t1)">₹'+fmt(buyCost)+'</div></div>' +
-      '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:4px">Sell Amount</div><div class="mono" style="font-size:18px;font-weight:700;color:var(--blue-b)">₹'+fmt(sellAmt)+'</div></div>' +
+    '<div style="display:grid;grid-template-columns:repeat('+(showConv?4:3)+',1fr);gap:10px;background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:12px">' +
+      '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:4px">Buy Cost (INR)</div><div class="mono" style="font-size:18px;font-weight:700;color:var(--t1)">₹'+fmt(buyCost)+'</div></div>' +
+      '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:4px">Sell Amount (INR)</div><div class="mono" style="font-size:18px;font-weight:700;color:var(--blue-b)">₹'+fmt(sellAmt)+'</div></div>' +
       '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:4px">Margin</div><div class="mono" style="font-size:18px;font-weight:700;color:'+(margin>=0?'var(--green-b)':'var(--red-b)')+'">₹'+fmt(Math.abs(margin))+' '+(margin>=0?'▲':'▼')+'</div></div>' +
+      (showConv?'<div style="background:#eff6ff;border-radius:5px;padding:8px"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#1e40af;margin-bottom:4px">Sell in '+qCur+' (export)</div><div class="mono" style="font-size:18px;font-weight:700;color:#1d4ed8">'+expSym+fmt(Math.round(sellAmt/qEx))+'</div><div style="font-size:10px;color:#3b82f6">@ ₹'+qEx+'/'+qCur+'</div></div>':'') +
     '</div>' +
     (q.notes ? '<div style="margin-top:10px;font-size:12px;color:var(--t2);background:var(--s2);border-radius:4px;padding:8px">📝 '+esc(q.notes)+'</div>' : '');
   openMo('mo-quot-view');
@@ -2580,6 +2593,20 @@ function buildQuotForm(q) {
     '<div class="fgi"><label class="fl">Units / Packages</label><input class="fi" type="number" id="q_units" value="'+(q.units||'')+'" placeholder="e.g. 100"></div>' +
     '<div class="fgi"><label class="fl">Chargeable Weight (kg)</label><input class="fi" type="number" id="q_cwt" value="'+(q.chargeable_weight||'')+'" placeholder="e.g. 75"></div>' +
     '<div class="fgi"><label class="fl">Status</label><select class="fi" id="q_st">'+['Draft','Sent','Approved','Rejected'].map(function(o){ return '<option'+(q.status===o?' selected':'')+'>'+o+'</option>'; }).join('')+'</select></div>' +
+    '</div>' +
+    // Currency conversion banner (INR entry, optional USD/EUR/GBP export)
+    '<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:6px;padding:9px 14px;margin-bottom:10px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">' +
+      '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><span style="font-size:13px">💱</span><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#1e40af">Customer Quote Export Currency</span></div>' +
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1">' +
+        '<div style="display:flex;align-items:center;gap:5px"><label style="font-size:11px;color:#475569;white-space:nowrap">All charges entered in <b>INR ₹</b>. Export sell quote as:</label>' +
+        '<select class="fi" id="q_cur" onchange="qOnCurrencyChange(this.value)" style="width:auto;padding:4px 8px;font-size:12px"><option value="INR"'+((!q.currency||q.currency==='INR')?' selected':'')+'>INR ₹ (no conversion)</option><option value="USD"'+(q.currency==='USD'?' selected':'')+'>USD $</option><option value="EUR"'+(q.currency==='EUR'?' selected':'')+'>EUR €</option><option value="GBP"'+(q.currency==='GBP'?' selected':'')+'>GBP £</option></select></div>' +
+        '<div id="q-exrate-wrap" style="display:flex;align-items:center;gap:5px;'+((!q.currency||q.currency==='INR')?'opacity:.4;pointer-events:none':'')+'">' +
+          '<label style="font-size:11px;color:#475569;white-space:nowrap">@ 1 <span id="q-cur-lbl">'+(q.currency&&q.currency!=='INR'?q.currency:'USD')+'</span> =</label>' +
+          '<input class="fi" type="number" id="q_exrate" value="'+(q.exchange_rate||'')+'" placeholder="e.g. 84.50" oninput="qCalcTotals()" style="width:90px;padding:4px 8px;font-size:12px">' +
+          '<label style="font-size:11px;color:#475569">INR</label>' +
+        '</div>' +
+        '<span id="q-exrate-hint" style="font-size:11px;color:#2563eb;font-style:italic;'+((!q.currency||q.currency==='INR')?'display:none':'')+'">PDF will show sell amounts converted to <span id="q-cur-lbl2">'+(q.currency||'USD')+'</span></span>' +
+      '</div>' +
     '</div>' +
     // Templates panel
     '<div style="background:var(--amber-l);border:1px solid var(--amber);border-radius:6px;padding:8px 12px;margin-bottom:10px;display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">' +
@@ -2636,6 +2663,27 @@ function qChargeTableHTML(side, rows) {
     '<datalist id="q-charge-list">'+allChargeHeads().map(function(h){ return '<option value="'+h+'">'; }).join('')+'</datalist>';
 }
 
+function qCurSymbol() {
+  // All charges are always entered in INR
+  return '₹';
+}
+function qCurLabel() {
+  // All charges are always entered in INR
+  return 'INR';
+}
+function qOnCurrencyChange(val) {
+  var wrap = document.getElementById('q-exrate-wrap');
+  var hint = document.getElementById('q-exrate-hint');
+  var lbl  = document.getElementById('q-cur-lbl');
+  var lbl2 = document.getElementById('q-cur-lbl2');
+  var isINR = (val === 'INR');
+  if (wrap) wrap.style.cssText = isINR ? 'display:flex;align-items:center;gap:5px;opacity:.4;pointer-events:none' : 'display:flex;align-items:center;gap:5px;';
+  if (hint) hint.style.display = isINR ? 'none' : '';
+  if (lbl)  lbl.textContent  = isINR ? 'USD' : val;
+  if (lbl2) lbl2.textContent = val;
+  qCalcTotals();
+}
+
 function qRowChange(side, idx, field, val) {
   var rows = side==='recv' ? qRecvRows : qSentRows;
   rows[idx][field] = val;
@@ -2644,7 +2692,7 @@ function qRowChange(side, idx, field, val) {
   var total = rate * qty;
   rows[idx].total = total > 0 ? String(total) : '';
   var tEl = document.getElementById('q-'+side+'-t-'+idx);
-  if (tEl) tEl.textContent = total > 0 ? '₹'+fmt(total) : '—';
+  if (tEl) tEl.textContent = total > 0 ? qCurSymbol()+fmt(total) : '—';
   qCalcTotals();
 }
 function qAddRow(side) {
@@ -2689,7 +2737,7 @@ function buildQuotFormCharges() {
         '<td style="padding:3px 4px;border:1px solid var(--b1)"><input list="q-charge-list" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:inherit;color:var(--t1);outline:none;padding:2px 4px" value="'+esc(r.desc||'')+'" oninput="qRowChange(\''+side+'\','+i+',\'desc\',this.value)"></td>' +
         '<td style="padding:3px 4px;border:1px solid var(--b1)"><input type="number" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:monospace;color:var(--t1);outline:none;padding:2px 4px;text-align:right" value="'+esc(r.rate||'')+'" oninput="qRowChange(\''+side+'\','+i+',\'rate\',this.value)" placeholder="0"></td>' +
         '<td style="padding:3px 4px;border:1px solid var(--b1)"><input type="number" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:monospace;color:var(--t1);outline:none;padding:2px 4px;text-align:right" value="'+esc(r.qty||'1')+'" oninput="qRowChange(\''+side+'\','+i+',\'qty\',this.value)" placeholder="1"></td>' +
-        '<td style="padding:3px 4px;border:1px solid var(--b1);text-align:right;font-family:monospace;font-weight:600;color:'+color+';font-size:12px" id="q-'+side+'-t-'+i+'">'+(r.total&&parseFloat(r.total)>0?'₹'+fmt(parseFloat(r.total)):'—')+'</td>' +
+        '<td style="padding:3px 4px;border:1px solid var(--b1);text-align:right;font-family:monospace;font-weight:600;color:'+color+';font-size:12px" id="q-'+side+'-t-'+i+'">'+(r.total&&parseFloat(r.total)>0?qCurSymbol()+fmt(parseFloat(r.total)):'—')+'</td>' +
         '<td style="padding:3px 4px;border:1px solid var(--b1);text-align:center"><span style="cursor:pointer;color:var(--t3);font-size:13px" onclick="qRemoveRow(\''+side+'\','+i+')">×</span></td>' +
       '</tr>';
     }).join('');
@@ -2704,11 +2752,16 @@ function qCalcTotals() {
   var sEl = document.getElementById('q-sent-total');
   if (rEl) rEl.textContent = '₹'+fmt(buyTotal);
   if (sEl) sEl.textContent = '₹'+fmt(sellTotal);
+  // Show USD/foreign conversion hint in margin strip if a rate is set
+  var expCur = (document.getElementById('q_cur')||{}).value || 'INR';
+  var exRate = parseFloat((document.getElementById('q_exrate')||{}).value)||0;
+  var expSym = {INR:'₹',USD:'$',EUR:'€',GBP:'£'}[expCur]||'₹';
+  var sellConv = (expCur!=='INR'&&exRate) ? '<div style="font-size:10px;color:#2563eb;margin-top:2px;font-weight:600">≈ '+expSym+fmt(Math.round(sellTotal/exRate))+' '+expCur+' (export)</div>' : '';
   var strip = document.getElementById('q-margin-strip');
   if (strip) {
     strip.innerHTML =
       '<div><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:3px">Buy Cost</div><div class="mono" style="font-size:16px;font-weight:700;color:var(--t1)">₹'+fmt(buyTotal)+'</div></div>' +
-      '<div><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:3px">Sell Amount</div><div class="mono" style="font-size:16px;font-weight:700;color:var(--blue-b)">₹'+fmt(sellTotal)+'</div></div>' +
+      '<div><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:3px">Sell Amount</div><div class="mono" style="font-size:16px;font-weight:700;color:var(--blue-b)">₹'+fmt(sellTotal)+'</div>'+sellConv+'</div>' +
       '<div><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:3px">Margin</div><div class="mono" style="font-size:16px;font-weight:700;color:'+(margin>=0?'var(--green-b)':'var(--red-b)')+'">₹'+fmt(Math.abs(margin))+' '+(margin>=0?'▲':'▼')+'</div></div>' +
       '<div><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:3px">Margin %</div><div class="mono" style="font-size:16px;font-weight:700;color:'+(mpct>=0?'var(--green-b)':'var(--red-b)')+'">'+mpct+'%</div></div>';
   }
@@ -2730,6 +2783,8 @@ async function saveQuot() {
     units: qUnits === '' ? 0 : Number(qUnits),
     chargeable_weight: (document.getElementById('q_cwt')||{}).value === '' ? null : Number((document.getElementById('q_cwt')||{}).value),
     status: (document.getElementById('q_st')||{}).value,
+    currency: (document.getElementById('q_cur')||{}).value || 'INR',
+    exchange_rate: parseFloat((document.getElementById('q_exrate')||{}).value)||null,
     notes: (document.getElementById('q_nt')||{}).value,
     recv_charges: qRecvRows.map(function(r){ return {desc:r.desc,rate:r.rate,qty:r.qty,total:r.total}; }),
     sent_charges: qSentRows.map(function(r){ return {desc:r.desc,rate:r.rate,qty:r.qty,total:r.total}; }),
@@ -2749,6 +2804,102 @@ async function saveQuot() {
     toast('Saved ✓','ok'); closeMo('mo-quot'); renderAll();
   } catch(e) { toast('Error: '+e.message,'err'); }
 }
+function exportQuotPDF() {
+  var id = viewQuotId;
+  if (!id) { toast('No quotation selected','err'); return; }
+  var q = DB.quots.find(function(x){ return x.id===id; });
+  if (!q) { toast('Quotation not found','err'); return; }
+  var sent = q.sent_charges || [];
+  var sellAmtINR = sent.reduce(function(a,r){ return a+(parseFloat(r.total)||0); },0);
+  var qCur = q.currency || 'INR';
+  var qEx  = parseFloat(q.exchange_rate)||0;  // 1 qCur = qEx INR
+  var showConv = (qCur !== 'INR' && qEx > 0);
+  var expSym = {INR:'₹',USD:'$',EUR:'€',GBP:'£'}[qCur]||'₹';
+
+  // PDF primary column: if INR-only show INR; if conversion set, show foreign currency as primary
+  // All stored values are INR; divide by exchange rate to get foreign amount
+  var primaryCur  = showConv ? qCur  : 'INR';
+  var primarySym  = showConv ? expSym : '₹';
+  function toExp(inrVal) { return showConv ? Math.round(inrVal / qEx * 100) / 100 : inrVal; }
+  function fmtExp(inrVal) { return primarySym + (showConv ? (Math.round(inrVal/qEx*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : fmt(inrVal)); }
+
+  var rows = sent.map(function(r){
+    var t = parseFloat(r.total)||0;
+    var rateDisp = parseFloat(r.rate)||0;
+    var inrCol = showConv ? '<td style="padding:9px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-family:monospace;color:#94a3b8;font-size:11px">'+(t?'₹'+fmt(t):'-')+'</td>' : '';
+    return '<tr>' +
+      '<td style="padding:9px 12px;border-bottom:1px solid #e5e7eb">'+esc(r.desc||'-')+'</td>' +
+      '<td style="padding:9px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-family:monospace">'+(rateDisp?fmtExp(rateDisp):'-')+'</td>' +
+      '<td style="padding:9px 12px;border-bottom:1px solid #e5e7eb;text-align:center">'+(r.qty||1)+'</td>' +
+      '<td style="padding:9px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;font-family:monospace">'+(t?fmtExp(t):'-')+'</td>' +
+      inrCol +
+    '</tr>';
+  }).join('');
+
+  var inrHeader = showConv ? '<th style="padding:9px 12px;background:#f8fafc;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8">Amount (INR)</th>' : '';
+  var inrTotalCell = showConv ? '<td style="padding:11px 12px;text-align:right;font-weight:700;font-family:monospace;font-size:13px;color:#94a3b8">₹'+fmt(sellAmtINR)+'</td>' : '';
+  var convNote = showConv ? '<div style="font-size:10px;color:#64748b;margin-top:8px;text-align:right;font-style:italic">Exchange rate: 1 '+qCur+' = ₹'+qEx+' INR (at time of quotation)</div>' : '';
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+esc(q.quote_number||'Quotation')+'</title>' +
+  '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:13px;color:#1e293b;background:#fff}' +
+  '.page{max-width:794px;margin:0 auto;padding:40px 48px}' +
+  '@media print{body{padding:0}.page{padding:28px 36px}@page{size:A4;margin:10mm}}' +
+  '</style></head><body><div class="page">' +
+  // Header
+  '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid #1e3a5f">' +
+    '<div>' +
+      '<div style="font-size:22px;font-weight:800;color:#1e3a5f;letter-spacing:.02em">BGSG Logistics</div>' +
+      '<div style="font-size:11px;color:#64748b;margin-top:4px;text-transform:uppercase;letter-spacing:.1em">Freight Forwarding &amp; Logistics</div>' +
+    '</div>' +
+    '<div style="text-align:right">' +
+      '<div style="font-size:22px;font-weight:800;color:#1e3a5f">QUOTATION</div>' +
+      '<div style="font-size:13px;font-weight:700;color:#f59e0b;margin-top:4px">'+(q.quote_number||'—')+'</div>' +
+      '<div style="font-size:11px;color:#64748b;margin-top:2px">Date: '+fmtD(q.date)+'</div>' +
+    '</div>' +
+  '</div>' +
+  // Info strip
+  '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px;background:#f8fafc;border-radius:8px;padding:14px 16px">' +
+    '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:#94a3b8;margin-bottom:3px">Customer</div><div style="font-size:13px;font-weight:700;color:#1e293b">'+(q.customer_name||'—')+'</div></div>' +
+    '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:#94a3b8;margin-bottom:3px">Route</div><div style="font-size:13px;font-weight:600;color:#1e293b">'+(q.origin||'—')+' → '+(q.destination||'—')+'</div></div>' +
+    '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:#94a3b8;margin-bottom:3px">Mode</div><div style="font-size:13px;font-weight:600;color:#1e293b">'+(q.mode||'—')+'</div></div>' +
+    (q.units ? '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:#94a3b8;margin-bottom:3px">Units/Packages</div><div style="font-size:13px;font-weight:600;color:#1e293b">'+q.units+'</div></div>' : '') +
+    (q.chargeable_weight ? '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:#94a3b8;margin-bottom:3px">Chargeable Wt.</div><div style="font-size:13px;font-weight:600;color:#1e293b">'+q.chargeable_weight+' kg</div></div>' : '') +
+  '</div>' +
+  // Charges table
+  '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:#1e3a5f;margin-bottom:8px;padding:6px 10px;background:#dbeafe;border-radius:5px;border-left:3px solid #2563eb">Customer Quotation — Sell Amount '+(showConv?'('+qCur+')':'(INR)')+'</div>' +
+  '<table style="width:100%;border-collapse:collapse;margin-bottom:4px">' +
+    '<thead><tr style="background:#f1f5f9">' +
+      '<th style="padding:9px 12px;background:#f1f5f9;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#475569">Charge Description</th>' +
+      '<th style="padding:9px 12px;background:#f1f5f9;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#475569">Rate ('+primaryCur+')</th>' +
+      '<th style="padding:9px 12px;background:#f1f5f9;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#475569">Qty</th>' +
+      '<th style="padding:9px 12px;background:#f1f5f9;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#475569">Amount ('+primaryCur+')</th>' +
+      inrHeader +
+    '</tr></thead>' +
+    '<tbody>'+rows+'</tbody>' +
+    '<tfoot><tr style="background:#1e3a5f">' +
+      '<td colspan="3" style="padding:11px 12px;font-weight:700;font-size:13px;color:#fff">TOTAL AMOUNT</td>' +
+      '<td style="padding:11px 12px;text-align:right;font-weight:700;font-family:monospace;font-size:16px;color:#fbbf24">'+fmtExp(sellAmtINR)+'</td>' +
+      inrTotalCell +
+    '</tr></tfoot>' +
+  '</table>' +
+  convNote +
+  (q.notes ? '<div style="background:#fef9ec;border:1px solid #fcd34d;border-radius:6px;padding:12px 14px;margin-top:16px;margin-bottom:16px"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#92400e;margin-bottom:4px">Notes</div><div style="font-size:12px;color:#451a03">'+esc(q.notes)+'</div></div>' : '<div style="margin-top:16px"></div>') +
+  // Footer
+  '<div style="border-top:1px solid #e2e8f0;padding-top:14px;display:flex;justify-content:space-between;align-items:center">' +
+    '<div style="font-size:10px;color:#94a3b8">This quotation is valid for 7 days from the date of issue. Prices subject to change.</div>' +
+    '<div style="font-size:10px;color:#94a3b8">Generated: '+new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+'</div>' +
+  '</div>' +
+  '</div></body></html>';
+
+  var w = window.open('','_blank','width=920,height=720');
+  if (!w) { toast('Allow popups to export PDF','err'); return; }
+  w.document.write(html);
+  w.document.close();
+  setTimeout(function(){ w.focus(); w.print(); }, 500);
+  toast('PDF export opened ✓','ok');
+}
+
+
 async function delQuot(id) {
   document.getElementById('conf-title').textContent = 'Delete Quotation';
   document.getElementById('conf-msg').textContent = 'Delete this quotation?';
@@ -3778,7 +3929,11 @@ function renderRpt() {
 }
 
 // ── SETTINGS ──────────────────────────────────────────────
-var SQL_SCHEMA = 'create table if not exists shipments (\n  id text primary key,\n  job_number text unique not null,\n  shipment_date date, customer_name text, shipper_name text,\n  consignee_name text, shipment_type text, mode text,\n  pol text, pod text, final_destination text, commodity text,\n  packages int, gross_weight numeric, chargeable_weight numeric, volume numeric,\n  invoice_number text, invoice_currency text default \'INR\', invoice_value numeric, exchange_rate numeric, invoice_value_inr numeric, mawb_hawb text, mbl_hbl text, airline_shipping_line text,\n  etd date, eta date, actual_departure date, actual_arrival date,\n  cha_name text, vendor_name text,\n  duty_amount numeric default 0, billing_amount numeric default 0, vendor_cost numeric default 0, cust_invoice_no text, cust_invoice_date date, cust_currency text, cust_amount_orig numeric, cust_exchange_rate numeric, cust_amount_inr numeric, vendor_invoice_no text, vendor_payment_status text default \'Unpaid\',\n  current_stage text default \'inquiry_received\', stages jsonb default \'{}\',\n  billing_status text default \'Unbilled\', payment_status text default \'Pending\',\n  pod_status text default \'POD Pending\', pending_with text, next_action text,\n  target_date date, remarks text,\n  doc_checklist boolean default false, doc_ci boolean default false,\n  doc_pl boolean default false, doc_kyc boolean default false,\n  doc_gst_iec boolean default false, doc_shipping_bill boolean default false,\n  doc_remarks text, created_at timestamptz default now()\n);\ncreate table if not exists quotations (\n  id text primary key, quote_number text, date date,\n  customer_name text, origin text, destination text, mode text,\n  buy_cost numeric default 0, sell_amount numeric default 0,\n  status text default \'Draft\', notes text, charges jsonb default \'[]\',\n  created_at timestamptz default now()\n);\ncreate table if not exists payments (\n  id text primary key, job_number text, party text,\n  invoice_number text, type text, amount numeric default 0,\n  date date, due_date date, status text default \'Pending\',\n  paid_date date, created_at timestamptz default now()\n);\ncreate table if not exists activity (\n  id text primary key, text text, type text,\n  shipment_id text, created_at timestamptz default now()\n);\n\n-- Enable RLS with open access (customize for your auth):\nalter table shipments enable row level security;\nalter table quotations enable row level security;\nalter table payments enable row level security;\nalter table activity enable row level security;\ncreate policy "open" on shipments for all using (true) with check (true);\ncreate policy "open" on quotations for all using (true) with check (true);\ncreate policy "open" on payments for all using (true) with check (true);\ncreate policy "open" on activity for all using (true) with check (true);';
+var SQL_SCHEMA = 'create table if not exists shipments (\n  id text primary key,\n  job_number text unique not null,\n  shipment_date date, customer_name text, shipper_name text,\n  consignee_name text, shipment_type text, mode text,\n  pol text, pod text, final_destination text, commodity text,\n  packages int, gross_weight numeric, chargeable_weight numeric, volume numeric,\n  invoice_number text, invoice_currency text default \'INR\', invoice_value numeric, exchange_rate numeric, invoice_value_inr numeric, mawb_hawb text, mbl_hbl text, airline_shipping_line text,\n  etd date, eta date, actual_departure date, actual_arrival date,\n  cha_name text, vendor_name text,\n  duty_amount numeric default 0, billing_amount numeric default 0, vendor_cost numeric default 0, cust_invoice_no text, cust_invoice_date date, cust_currency text, cust_amount_orig numeric, cust_exchange_rate numeric, cust_amount_inr numeric, vendor_invoice_no text, vendor_payment_status text default \'Unpaid\',\n  current_stage text default \'inquiry_received\', stages jsonb default \'{}\',\n  billing_status text default \'Unbilled\', payment_status text default \'Pending\',\n  pod_status text default \'POD Pending\', pending_with text, next_action text,\n  target_date date, remarks text,\n  doc_checklist boolean default false, doc_ci boolean default false,\n  doc_pl boolean default false, doc_kyc boolean default false,\n  doc_gst_iec boolean default false, doc_shipping_bill boolean default false,\n  doc_remarks text, created_at timestamptz default now()\n);\ncreate table if not exists quotations (\n  id text primary key, quote_number text, date date,\n  customer_name text, origin text, destination text, mode text,\n  units numeric, chargeable_weight numeric,\n  buy_cost numeric default 0, sell_amount numeric default 0,\n  status text default \'Draft\', notes text,\n  charges jsonb default \'[]\',\n  recv_charges jsonb default \'[]\',\n  sent_charges jsonb default \'[]\',\n  currency text default \'INR\',\n  exchange_rate numeric,\n  job_number text,\n  created_at timestamptz default now()\n);\ncreate table if not exists payments (\n  id text primary key, job_number text, party text,\n  invoice_number text, type text, amount numeric default 0,\n  date date, due_date date, status text default \'Pending\',\n  paid_date date, created_at timestamptz default now()\n);\ncreate table if not exists activity (\n  id text primary key, text text, type text,\n  shipment_id text, created_at timestamptz default now()\n);\n\n-- Enable RLS with open access (customize for your auth):\nalter table shipments enable row level security;\nalter table quotations enable row level security;\nalter table payments enable row level security;\nalter table activity enable row level security;\ncreate policy "open" on shipments for all using (true) with check (true);\ncreate policy "open" on quotations for all using (true) with check (true);\ncreate policy "open" on payments for all using (true) with check (true);\ncreate policy "open" on activity for all using (true) with check (true);';
+
+var MIGRATION_SQL = "-- Run this in Supabase SQL Editor to add missing columns to existing tables\n-- Safe to run multiple times (IF NOT EXISTS)\n\nALTER TABLE quotations ADD COLUMN IF NOT EXISTS recv_charges jsonb DEFAULT '[]';\nALTER TABLE quotations ADD COLUMN IF NOT EXISTS sent_charges jsonb DEFAULT '[]';\nALTER TABLE quotations ADD COLUMN IF NOT EXISTS currency text DEFAULT 'INR';\nALTER TABLE quotations ADD COLUMN IF NOT EXISTS exchange_rate numeric;\nALTER TABLE quotations ADD COLUMN IF NOT EXISTS units numeric;\nALTER TABLE quotations ADD COLUMN IF NOT EXISTS chargeable_weight numeric;\nALTER TABLE quotations ADD COLUMN IF NOT EXISTS job_number text;";
+
+function copyMigrationSQL() { navigator.clipboard.writeText(MIGRATION_SQL).then(function(){ toast('Migration SQL copied ✓','ok'); }); }
 
 function renderSettings() {
   document.getElementById('set-body').innerHTML =
@@ -3793,9 +3948,36 @@ function renderSettings() {
     '<div class="card"><div class="card-h"><span class="card-title">Supabase SQL Schema</span><button class="btn btn-sm" onclick="copySQL()">📋 Copy SQL</button></div><div class="card-b">' +
       '<p style="font-size:12px;color:var(--t2);margin-bottom:10px">Run this in your Supabase SQL Editor to create all required tables:</p>' +
       '<pre style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:12px;font-size:10.5px;color:var(--t2);overflow-x:auto;line-height:1.7;font-family:\'JetBrains Mono\',monospace;white-space:pre">'+SQL_SCHEMA+'</pre>' +
+    '</div></div>' +
+    '<div class="card" style="margin-top:12px"><div class="card-h"><span class="card-title">⚡ Migration SQL</span><button class="btn btn-sm btn-bl" onclick="copyMigrationSQL()">📋 Copy Migration SQL</button></div><div class="card-b">' +
+      '<p style="font-size:12px;color:var(--t2);margin-bottom:10px">If your database already exists, run this in Supabase SQL Editor to add the new columns (safe to run multiple times):</p>' +
+      '<pre style="background:#fefce8;border:1px solid #fcd34d;border-radius:6px;padding:12px;font-size:10.5px;color:#92400e;overflow-x:auto;line-height:1.7;font-family:\'JetBrains Mono\',monospace;white-space:pre">'+MIGRATION_SQL+'</pre>' +
     '</div></div>';
 }
 function copySQL() { navigator.clipboard.writeText(SQL_SCHEMA).then(function(){ toast('SQL copied ✓','ok'); }); }
+
+// ── AUTO-MIGRATION ─────────────────────────────────────────
+// Safely adds missing columns to existing Supabase tables
+async function runMigrations() {
+  if (!sb || !isLive) return;
+  var migrations = [
+    "ALTER TABLE quotations ADD COLUMN IF NOT EXISTS recv_charges jsonb DEFAULT '[]'",
+    "ALTER TABLE quotations ADD COLUMN IF NOT EXISTS sent_charges jsonb DEFAULT '[]'",
+    "ALTER TABLE quotations ADD COLUMN IF NOT EXISTS currency text DEFAULT 'INR'",
+    "ALTER TABLE quotations ADD COLUMN IF NOT EXISTS exchange_rate numeric",
+    "ALTER TABLE quotations ADD COLUMN IF NOT EXISTS units numeric",
+    "ALTER TABLE quotations ADD COLUMN IF NOT EXISTS chargeable_weight numeric",
+    "ALTER TABLE quotations ADD COLUMN IF NOT EXISTS job_number text"
+  ];
+  for (var i = 0; i < migrations.length; i++) {
+    try {
+      await sb.rpc('run_sql', { query: migrations[i] });
+    } catch(e) {
+      // Column may already exist or rpc not available — try direct approach
+      try { await sb.rpc('exec_sql', { sql: migrations[i] }); } catch(e2) { /* silent */ }
+    }
+  }
+}
 
 // ── GLOBAL SEARCH ─────────────────────────────────────────
 function gsearchRun(q) {
