@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BGSG Logistics</title>
+<title>BGSG Freight Pro</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
@@ -2644,23 +2644,68 @@ function qChargeTableHTML(side, rows) {
   var color = side==='recv' ? '#0d9488' : 'var(--blue-b)';
   return '<table style="width:100%;border-collapse:collapse;font-size:11.5px" id="q-tbl-'+side+'">' +
     '<thead><tr>' +
+      '<th style="width:18px;border:1px solid var(--b1);background:var(--s2)"></th>' +
       '<th style="text-align:left;padding:5px 6px;background:var(--s2);border:1px solid var(--b1);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;min-width:160px">Charge Description</th>' +
       '<th style="text-align:right;padding:5px 6px;background:var(--s2);border:1px solid var(--b1);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;width:80px">Rate</th>' +
       '<th style="text-align:right;padding:5px 6px;background:var(--s2);border:1px solid var(--b1);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;width:55px">Qty</th>' +
       '<th style="text-align:right;padding:5px 6px;background:var(--s2);border:1px solid var(--b1);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;width:85px">Total</th>' +
       '<th style="width:20px;border:1px solid var(--b1);background:var(--s2)"></th>' +
     '</tr></thead><tbody>' +
-    rows.map(function(r,i){
-      return '<tr id="q-'+side+'-row-'+i+'">' +
-        '<td style="padding:3px 4px;border:1px solid var(--b1)"><input list="q-charge-list" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:inherit;color:var(--t1);outline:none;padding:2px 4px" value="'+esc(r.desc||'')+'" oninput="qRowChange(\''+side+'\','+i+',\'desc\',this.value)"></td>' +
-        '<td style="padding:3px 4px;border:1px solid var(--b1)"><input type="number" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:monospace;color:var(--t1);outline:none;padding:2px 4px;text-align:right" value="'+esc(r.rate||'')+'" oninput="qRowChange(\''+side+'\','+i+',\'rate\',this.value)" placeholder="0"></td>' +
-        '<td style="padding:3px 4px;border:1px solid var(--b1)"><input type="number" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:monospace;color:var(--t1);outline:none;padding:2px 4px;text-align:right" value="'+esc(r.qty||'1')+'" oninput="qRowChange(\''+side+'\','+i+',\'qty\',this.value)" placeholder="1"></td>' +
-        '<td style="padding:3px 4px;border:1px solid var(--b1);text-align:right;font-family:monospace;font-weight:600;color:'+color+';font-size:12px" id="q-'+side+'-t-'+i+'">'+(r.total?'₹'+fmt(parseFloat(r.total)):'—')+'</td>' +
-        '<td style="padding:3px 4px;border:1px solid var(--b1);text-align:center"><span style="cursor:pointer;color:var(--t3);font-size:13px" onclick="qRemoveRow(\''+side+'\','+i+')">×</span></td>' +
-      '</tr>';
-    }).join('') +
+    rows.map(function(r,i){ return qRowHTML(side, r, i); }).join('') +
     '</tbody></table>' +
     '<datalist id="q-charge-list">'+allChargeHeads().map(function(h){ return '<option value="'+h+'">'; }).join('')+'</datalist>';
+}
+
+// ── DRAG-AND-DROP ROW REORDERING ──────────────────────────
+var qDragSide = null, qDragIdx = null;
+
+function qRowHTML(side, r, i) {
+  var color = side==='recv' ? '#0d9488' : 'var(--blue-b)';
+  return '<tr id="q-'+side+'-row-'+i+'" draggable="true" ' +
+    'ondragstart="qDragStart(\''+side+'\','+i+',event)" ' +
+    'ondragover="qDragOver(\''+side+'\','+i+',event)" ' +
+    'ondragend="qDragEnd(event)" ' +
+    'ondrop="qDrop(\''+side+'\','+i+',event)" ' +
+    'style="transition:background .12s">' +
+    '<td style="padding:3px 4px;border:1px solid var(--b1);text-align:center;cursor:grab;user-select:none;color:var(--t3);font-size:14px;line-height:1" title="Drag to reorder">⠿</td>' +
+    '<td style="padding:3px 4px;border:1px solid var(--b1)"><input list="q-charge-list" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:inherit;color:var(--t1);outline:none;padding:2px 4px" value="'+esc(r.desc||'')+'" oninput="qRowChange(\''+side+'\','+i+',\'desc\',this.value)"></td>' +
+    '<td style="padding:3px 4px;border:1px solid var(--b1)"><input type="number" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:monospace;color:var(--t1);outline:none;padding:2px 4px;text-align:right" value="'+esc(r.rate||'')+'" oninput="qRowChange(\''+side+'\','+i+',\'rate\',this.value)" placeholder="0"></td>' +
+    '<td style="padding:3px 4px;border:1px solid var(--b1)"><input type="number" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:monospace;color:var(--t1);outline:none;padding:2px 4px;text-align:right" value="'+esc(r.qty||'1')+'" oninput="qRowChange(\''+side+'\','+i+',\'qty\',this.value)" placeholder="1"></td>' +
+    '<td style="padding:3px 4px;border:1px solid var(--b1);text-align:right;font-family:monospace;font-weight:600;color:'+color+';font-size:12px" id="q-'+side+'-t-'+i+'">'+(r.total&&parseFloat(r.total)>0?'₹'+fmt(parseFloat(r.total)):'—')+'</td>' +
+    '<td style="padding:3px 4px;border:1px solid var(--b1);text-align:center"><span style="cursor:pointer;color:var(--t3);font-size:13px" onclick="qRemoveRow(\''+side+'\','+i+')">×</span></td>' +
+  '</tr>';
+}
+function qDragStart(side, idx, e) {
+  qDragSide = side; qDragIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', idx);
+  setTimeout(function(){ var r = document.getElementById('q-'+side+'-row-'+idx); if(r) r.style.opacity='0.4'; }, 0);
+}
+function qDragOver(side, idx, e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  // Highlight drop target
+  var tbody = document.querySelector('#q-tbl-'+side+' tbody');
+  if (!tbody) return;
+  Array.from(tbody.rows).forEach(function(r,i){ r.style.background = (i===idx && qDragSide===side && idx!==qDragIdx) ? 'var(--blue-l,#eff6ff)' : ''; });
+}
+function qDragEnd(e) {
+  // Clear all highlights
+  ['recv','sent'].forEach(function(side){
+    var tbody = document.querySelector('#q-tbl-'+side+' tbody');
+    if (!tbody) return;
+    Array.from(tbody.rows).forEach(function(r){ r.style.opacity=''; r.style.background=''; });
+  });
+}
+function qDrop(side, toIdx, e) {
+  e.preventDefault();
+  if (qDragSide !== side || qDragIdx === null || qDragIdx === toIdx) { qDragEnd(e); return; }
+  var rows = side==='recv' ? qRecvRows : qSentRows;
+  var moved = rows.splice(qDragIdx, 1)[0];
+  rows.splice(toIdx, 0, moved);
+  qDragIdx = null; qDragSide = null;
+  buildQuotFormCharges();
+  qCalcTotals();
 }
 
 function qCurSymbol() {
@@ -2698,23 +2743,14 @@ function qRowChange(side, idx, field, val) {
 function qAddRow(side) {
   var rows = side==='recv' ? qRecvRows : qSentRows;
   rows.push({desc:'', rate:'', qty:'1', total:''});
-  // Rebuild just the table body efficiently
   var tbl = document.getElementById('q-tbl-'+side);
   if (tbl) {
-    var newRows = side==='recv' ? qRecvRows : qSentRows;
-    var tbody = tbl.querySelector('tbody');
-    var i = newRows.length-1;
-    var r = newRows[i];
-    var color = side==='recv' ? '#0d9488' : 'var(--blue-b)';
+    var i = rows.length - 1;
     var tr = document.createElement('tr');
-    tr.id = 'q-'+side+'-row-'+i;
-    tr.innerHTML =
-      '<td style="padding:3px 4px;border:1px solid var(--b1)"><input list="q-charge-list" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:inherit;color:var(--t1);outline:none;padding:2px 4px" value="" oninput="qRowChange(\''+side+'\','+i+',\'desc\',this.value)"></td>' +
-      '<td style="padding:3px 4px;border:1px solid var(--b1)"><input type="number" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:monospace;color:var(--t1);outline:none;padding:2px 4px;text-align:right" value="" oninput="qRowChange(\''+side+'\','+i+',\'rate\',this.value)" placeholder="0"></td>' +
-      '<td style="padding:3px 4px;border:1px solid var(--b1)"><input type="number" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:monospace;color:var(--t1);outline:none;padding:2px 4px;text-align:right" value="1" oninput="qRowChange(\''+side+'\','+i+',\'qty\',this.value)" placeholder="1"></td>' +
-      '<td style="padding:3px 4px;border:1px solid var(--b1);text-align:right;font-family:monospace;font-weight:600;color:'+color+';font-size:12px" id="q-'+side+'-t-'+i+'">—</td>' +
-      '<td style="padding:3px 4px;border:1px solid var(--b1);text-align:center"><span style="cursor:pointer;color:var(--t3);font-size:13px" onclick="qRemoveRow(\''+side+'\','+i+')">×</span></td>';
-    tbody.appendChild(tr);
+    tr.outerHTML; // dummy
+    var tmp = document.createElement('tbody');
+    tmp.innerHTML = qRowHTML(side, rows[i], i);
+    tbl.querySelector('tbody').appendChild(tmp.firstChild);
   }
 }
 function qRemoveRow(side, idx) {
@@ -2732,15 +2768,7 @@ function buildQuotFormCharges() {
     if (!tbl) return;
     var rows = side==='recv' ? qRecvRows : qSentRows;
     var color = side==='recv' ? '#0d9488' : 'var(--blue-b)';
-    tbl.querySelector('tbody').innerHTML = rows.map(function(r,i){
-      return '<tr id="q-'+side+'-row-'+i+'">' +
-        '<td style="padding:3px 4px;border:1px solid var(--b1)"><input list="q-charge-list" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:inherit;color:var(--t1);outline:none;padding:2px 4px" value="'+esc(r.desc||'')+'" oninput="qRowChange(\''+side+'\','+i+',\'desc\',this.value)"></td>' +
-        '<td style="padding:3px 4px;border:1px solid var(--b1)"><input type="number" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:monospace;color:var(--t1);outline:none;padding:2px 4px;text-align:right" value="'+esc(r.rate||'')+'" oninput="qRowChange(\''+side+'\','+i+',\'rate\',this.value)" placeholder="0"></td>' +
-        '<td style="padding:3px 4px;border:1px solid var(--b1)"><input type="number" style="width:100%;border:none;background:transparent;font-size:11.5px;font-family:monospace;color:var(--t1);outline:none;padding:2px 4px;text-align:right" value="'+esc(r.qty||'1')+'" oninput="qRowChange(\''+side+'\','+i+',\'qty\',this.value)" placeholder="1"></td>' +
-        '<td style="padding:3px 4px;border:1px solid var(--b1);text-align:right;font-family:monospace;font-weight:600;color:'+color+';font-size:12px" id="q-'+side+'-t-'+i+'">'+(r.total&&parseFloat(r.total)>0?qCurSymbol()+fmt(parseFloat(r.total)):'—')+'</td>' +
-        '<td style="padding:3px 4px;border:1px solid var(--b1);text-align:center"><span style="cursor:pointer;color:var(--t3);font-size:13px" onclick="qRemoveRow(\''+side+'\','+i+')">×</span></td>' +
-      '</tr>';
-    }).join('');
+    tbl.querySelector('tbody').innerHTML = rows.map(function(r,i){ return qRowHTML(side, r, i); }).join('');
   });
 }
 function qCalcTotals() {
@@ -2848,7 +2876,7 @@ function exportQuotPDF() {
   // Header
   '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid #1e3a5f">' +
     '<div>' +
-      '<div style="font-size:22px;font-weight:800;color:#1e3a5f;letter-spacing:.02em">BGSG Logistics</div>' +
+      '<div style="font-size:22px;font-weight:800;color:#1e3a5f;letter-spacing:.02em">BGSG FREIGHT PRO</div>' +
       '<div style="font-size:11px;color:#64748b;margin-top:4px;text-transform:uppercase;letter-spacing:.1em">Freight Forwarding &amp; Logistics</div>' +
     '</div>' +
     '<div style="text-align:right">' +
