@@ -315,7 +315,10 @@ textarea.fi{resize:vertical;min-height:65px}
 @media(max-width:1000px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.dg{grid-template-columns:1fr}.det-grid{grid-template-columns:1fr}.det-meta{grid-template-columns:repeat(2,1fr)}.dg3{grid-template-columns:1fr 1fr}}
 @media(max-width:640px){.kpi-grid{grid-template-columns:1fr}.fg{grid-template-columns:1fr}.sidebar{display:none}.content{padding:12px}}
 
-/* In-Transit row highlight */
+/* Pre-handover + In-Transit row highlights */
+tr.row-planned td { background: #ffedd5 !important; }
+tr.row-planned:hover td { background: #fed7aa !important; }
+tr.row-planned td:first-child { border-left: 3px solid #fb923c; }
 tr.row-intransit td { background: #fef3c7 !important; }
 tr.row-intransit:hover td { background: #fde68a !important; }
 tr.row-intransit td:first-child { border-left: 3px solid var(--amber); }
@@ -333,6 +336,7 @@ tr.row-intransit td:first-child { border-left: 3px solid var(--amber); }
 #shipments-table .ship-status-cell { font-size:10.5px !important; font-weight:700; }
 #shipments-table .ship-status-transit { color:var(--amber-b) !important; }
 #shipments-table .ship-status-delivered { color:var(--green-b) !important; }
+#shipments-table .ship-status-planned { color:var(--amber-b) !important; }
 #shipments-table .ship-status-other { color:var(--t3) !important; }
 
 /* Currency badge */
@@ -1084,6 +1088,10 @@ window.addEventListener('load', function() {
 
   // Populate stage filter
   var sf = document.getElementById('sf-stage');
+  var planOpt = document.createElement('option');
+  planOpt.value = 'to_be_planned';
+  planOpt.textContent = 'To Be Planned';
+  sf.appendChild(planOpt);
   STAGES.forEach(function(s) {
     var o = document.createElement('option');
     o.value = s.id; o.textContent = s.lbl;
@@ -1581,24 +1589,45 @@ function renderDash() {
 }
 
 // ── SHIPMENTS TABLE ───────────────────────────────────────
+function hasShipStageDone(s, stageId) {
+  if (!s || !stageId) return false;
+  var stages = s.stages || {};
+  if (stages[stageId]) return true;
+  var cur = normalizeStageId((s.current_stage) || '');
+  var curIdx = SIDS.indexOf(cur);
+  var stageIdx = SIDS.indexOf(stageId);
+  return curIdx >= 0 && stageIdx >= 0 && curIdx >= stageIdx;
+}
 function isShipDelivered(s) {
-  var idx = SIDS.indexOf(normalizeStageId((s && s.current_stage) || ''));
-  if (idx >= SIDS.indexOf('delivered')) return true;
-  if (s && s.stages && s.stages.delivered) return true;
-  if ((s && s.pod_status) === 'Delivered' || (s && s.pod_status) === 'POD Received') return true;
+  if (!s) return false;
+  if (hasShipStageDone(s, 'delivered')) return true;
+  if ((s.pod_status) === 'Delivered' || (s.pod_status) === 'POD Received') return true;
+  return false;
+}
+function isShipHandovered(s) {
+  if (!s) return false;
+  if (hasShipStageDone(s, 'cargo_handed_over')) return true;
+  // Legacy/imported data may only have departure fields, which still means cargo has been handed over.
+  if (s.stages && (s.stages.intransit || s.stages.departed || s.stages.actual_departure)) return true;
+  if (s.actual_departure) return true;
   return false;
 }
 function isShipInTransit(s) {
-  return !!s && !isShipDelivered(s);
+  return !!s && isShipHandovered(s) && !isShipDelivered(s);
+}
+function isShipToBePlanned(s) {
+  return !!s && !isShipHandovered(s) && !isShipDelivered(s);
 }
 function shipStatusLabel(s) {
   if (isShipDelivered(s)) return 'Delivered';
-  if (isShipInTransit(s)) return 'Intransit';
-  return slbl(s.current_stage);
+  if (isShipInTransit(s)) return 'In Transit';
+  if (isShipToBePlanned(s)) return 'To Be Planned';
+  return slbl((s && s.current_stage) || '');
 }
 function shipStatusClass(s) {
   if (isShipDelivered(s)) return 'ship-status-delivered';
   if (isShipInTransit(s)) return 'ship-status-transit';
+  if (isShipToBePlanned(s)) return 'ship-status-planned';
   return 'ship-status-other';
 }
 function renderShips() {
@@ -1621,7 +1650,9 @@ function renderShips() {
     if (mode && s.mode !== mode) return false;
     if (custF && s.customer_name !== custF) return false;
     if (stage) {
-      if (stage === 'intransit') {
+      if (stage === 'to_be_planned') {
+        if (!isShipToBePlanned(s)) return false;
+      } else if (stage === 'intransit') {
         if (!isShipInTransit(s)) return false;
       } else if (stage === 'delivered') {
         if (!isShipDelivered(s)) return false;
@@ -1664,7 +1695,8 @@ function renderShips() {
 
   document.getElementById('ship-tb').innerHTML = slice.length ? slice.map(function(s) {
     var isTransit = isShipInTransit(s);
-    var rowCls = 'cr' + (isTransit ? ' row-intransit' : '');
+    var isPlanned = isShipToBePlanned(s);
+    var rowCls = 'cr' + (isTransit ? ' row-intransit' : (isPlanned ? ' row-planned' : ''));
     var statusTxt = shipStatusLabel(s);
     var statusCls = shipStatusClass(s);
     var isSelected = selectedShips.indexOf(s.id) >= 0;
@@ -3509,12 +3541,16 @@ function populateBillCustomerFilter() {
 }
 function getShipmentStatusForBilling(s) {
   // Returns a display label + category for the shipment's delivery state
-  var stages = s.stages || {};
+  var stages = (s && s.stages) || {};
+  if (!s) return {lbl:'Pre-Shipment', cat:'pre-shipment', badge:'b-gy'};
   if (s.pod_status === 'POD Received' || stages.pod_received) return {lbl:'POD Received', cat:'pod-received', badge:'b-gr'};
-  if (s.pod_status === 'Delivered' || stages.delivered) return {lbl:'Delivered', cat:'delivered', badge:'b-bl'};
-  if (stages.actual_arrival || stages.arrived || s.actual_arrival) return {lbl:'Arrived', cat:'in-transit', badge:'b-te'};
-  if (stages.actual_departure || stages.departed || s.actual_departure) return {lbl:'In Transit', cat:'in-transit', badge:'b-am'};
-  return {lbl:'Pre-Shipment', cat:'in-transit', badge:'b-gy'};
+  if (isShipDelivered(s)) return {lbl:'Delivered', cat:'delivered', badge:'b-bl'};
+  if (isShipInTransit(s)) {
+    if (hasShipStageDone(s, 'arrived') || stages.actual_arrival || s.actual_arrival) return {lbl:'Arrived', cat:'in-transit', badge:'b-te'};
+    return {lbl:'In Transit', cat:'in-transit', badge:'b-am'};
+  }
+  if (isShipToBePlanned(s)) return {lbl:'To Be Planned', cat:'to-be-planned', badge:'b-am'};
+  return {lbl:'Pre-Shipment', cat:'pre-shipment', badge:'b-gy'};
 }
 function renderBillMain() {
   var q = (document.getElementById('billf-q')||{}).value || '';
