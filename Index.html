@@ -1398,19 +1398,21 @@ function renderDash() {
   var s = DB.ships;
   var today = new Date().toISOString().slice(0,10);
 
+  // Dashboard status card placement sequence requested:
+  // Total Shipment → Active Shipment → In Transit → To Be Planed → Delivered → Billing Pending → Payment Pending → Closed
   var kd = [
-    {key:'active', lbl:'Total Active', val:s.filter(function(x){return x.current_stage!=='file_closed';}).length, cls:'bl', sub:'in progress', ico:'🚢', hint:'Open shipments list'},
-    {key:'docs', lbl:'Pending Docs', val:s.filter(function(x){return hasPendingDocs(x);}).length, cls:'am', sub:'need docs', ico:'📄', hint:'Open incomplete documentation'},
-    {key:'customs', lbl:'Customs Pending', val:s.filter(function(x){var i=SIDS.indexOf(x.current_stage);return i>=SIDS.indexOf('cargo_handed_over')&&i<SIDS.indexOf('customs_cleared');}).length, cls:'', sub:'awaiting clearance', ico:'🏛', hint:'Open customs view'},
-    {key:'delivery', lbl:'In Transit', val:s.filter(function(x){return isShipInTransit(x);}).length, cls:'te', sub:'cargo moving', ico:'✈', hint:'Open intransit shipments'},
-    {key:'pod', lbl:'POD Pending', val:s.filter(function(x){return x.pod_status==='POD Pending'&&SIDS.indexOf(x.current_stage)>=SIDS.indexOf('delivered');}).length, cls:'am', sub:'awaiting proof', ico:'📋', hint:'Open POD pending list'},
+    {key:'total', lbl:'Total Shipment', val:s.length, cls:'bl', sub:'all shipments', ico:'🚢', hint:'Open all shipments'},
+    {key:'active', lbl:'Active Shipment', val:s.filter(function(x){return normalizeStageId(x.current_stage)!=='file_closed';}).length, cls:'bl', sub:'in progress', ico:'🚢', hint:'Open active shipments'},
+    {key:'intransit', lbl:'In Transit', val:s.filter(function(x){return isShipInTransit(x);}).length, cls:'te', sub:'cargo moving', ico:'✈', hint:'Open in-transit shipments'},
+    {key:'planned', lbl:'To Be Planed', val:s.filter(function(x){return isShipToBePlanned(x);}).length, cls:'am', sub:'need planning', ico:'📋', hint:'Open to-be-planed shipments'},
+    {key:'delivered', lbl:'Delivered', val:s.filter(function(x){return isShipDelivered(x);}).length, cls:'gr', sub:'delivered successfully', ico:'✅', hint:'Open delivered shipments'},
     {key:'billing', lbl:'Billing Pending', val:s.filter(function(x){
         var logiAmt=+(x.cust_amount_inr)||+(x.billing_amount)||0; if(logiAmt>0) return false;
         var stIdx=SIDS.indexOf(normalizeStageId(x.current_stage));
         return stIdx>=SIDS.indexOf('delivered')||(x.pod_status==='Delivered'||x.pod_status==='POD Received')||(x.stages&&(x.stages.delivered||x.stages.pod_received));
       }).length, cls:'am', sub:'unbilled', ico:'🧾', hint:'Open pending billing list'},
     {key:'payment', lbl:'Payment Pending', val:s.filter(function(x){return x.payment_status==='Pending'&&x.billing_status==='Billed';}).length, cls:'rd', sub:'awaiting payment', ico:'💳', hint:'Open payment pending shipments'},
-    {key:'closed', lbl:'Closed', val:s.filter(function(x){return x.current_stage==='file_closed';}).length, cls:'gr', sub:'files closed', ico:'✅', hint:'Open closed shipments'}
+    {key:'closed', lbl:'Closed', val:s.filter(function(x){return normalizeStageId(x.current_stage)==='file_closed';}).length, cls:'gr', sub:'files closed', ico:'✅', hint:'Open closed shipments'}
   ];
 
   var kpiHtml = function(k) {
@@ -1821,36 +1823,32 @@ function bulkMarkBilled() {
 function dashboardKpiClick(key) {
   clearFilters();
   var id;
+  if (key === 'total') {
+    nav('shipments');
+    renderShips();
+    return;
+  }
   if (key === 'active') {
     nav('shipments');
     renderShips();
     return;
   }
-  if (key === 'docs') {
-    id = document.getElementById('docf-q'); if (id) id.value = '';
-    id = document.getElementById('docf-st'); if (id) id.value = 'Incomplete';
-    nav('documentation');
-    renderDocs();
-    return;
-  }
-  if (key === 'customs') {
-    id = document.getElementById('custf-q'); if (id) id.value = '';
-    id = document.getElementById('custf-st'); if (id) id.value = '';
-    nav('customs');
-    renderCust();
-    return;
-  }
-  if (key === 'delivery') {
+  if (key === 'intransit') {
     id = document.getElementById('sf-stage'); if (id) id.value = 'intransit';
     nav('shipments');
     renderShips();
     return;
   }
-  if (key === 'pod') {
-    id = document.getElementById('delf-q'); if (id) id.value = '';
-    id = document.getElementById('delf-st'); if (id) id.value = 'POD Pending';
-    nav('delivery');
-    renderDel();
+  if (key === 'planned') {
+    id = document.getElementById('sf-stage'); if (id) id.value = 'to_be_planned';
+    nav('shipments');
+    renderShips();
+    return;
+  }
+  if (key === 'delivered') {
+    id = document.getElementById('sf-stage'); if (id) id.value = 'delivered';
+    nav('shipments');
+    renderShips();
     return;
   }
   if (key === 'billing') {
