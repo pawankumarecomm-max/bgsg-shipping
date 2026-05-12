@@ -3596,7 +3596,7 @@ function renderBillMain() {
   el.innerHTML =
     '<thead>' +
     '<tr style="background:var(--s2)">' +
-      '<td colspan="12" style="padding:8px 12px">' +
+      '<td colspan="13" style="padding:8px 12px">' +
         '<div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">' +
           '<span style="font-size:11px"><span style="color:var(--t3)">Logi: </span><span class="mono" style="font-weight:700;color:var(--green-b)">₹'+fmt(totalLogi)+'</span><span style="font-size:10px;color:var(--t3)"> · Rcvd ₹'+fmt(receivedLogi)+' · Pending ₹'+fmt(totalLogi-receivedLogi)+'</span></span>' +
           '<span style="font-size:11px"><span style="color:var(--t3)">Vendor: </span><span class="mono" style="font-weight:700;color:var(--amber-b)">₹'+fmt(totalVendor)+'</span><span style="font-size:10px;color:var(--t3)"> · Paid ₹'+fmt(paidVendor)+' · Unpaid ₹'+fmt(totalVendor-paidVendor)+'</span></span>' +
@@ -3606,6 +3606,7 @@ function renderBillMain() {
     '<tr>' +
       '<th style="min-width:90px">Job No.</th>' +
       '<th style="min-width:110px">Comm. Invoice No.</th>' +
+      '<th style="min-width:120px">Consignee</th>' +
       '<th style="min-width:110px">Route</th>' +
       '<th style="min-width:90px">Ship. Status</th>' +
       '<th style="min-width:75px">Status</th>' +
@@ -3648,7 +3649,7 @@ function renderBillMain() {
       var tdStyle = tdBg ? ' style="'+tdBg+'"' : '';
 
       // Invoice display (original style)
-      var logiInv = s.cust_invoice_no || s.invoice_number || '';
+      var logiInv = s.invoice_number || '';  // Commercial invoice number only
       var cur = s.cust_currency || s.invoice_currency || 'INR';
       var origAmt = +(s.cust_amount_orig)||+(s.invoice_value)||0;
 
@@ -3695,15 +3696,16 @@ function renderBillMain() {
             ? '<span class="badge b-rd" style="font-size:10px">Pending</span>'
             : '<span class="badge b-gy" style="font-size:10px">—</span>');
 
-      // Logistics Invoice No — only show when billed (has cust_invoice_no)
-      var logiInvDisplay = s.billing_status === 'Billed' && (s.cust_invoice_no || s.invoice_number)
-        ? '<span class="mono" style="font-size:11px;font-weight:600;color:var(--blue-b)">'+(s.cust_invoice_no || s.invoice_number)+'</span>'
+      // Logistics Invoice No — only show when billed and cust_invoice_no is set
+      var logiInvDisplay = s.billing_status === 'Billed' && s.cust_invoice_no
+        ? '<span class="mono" style="font-size:11px;font-weight:600;color:var(--blue-b)">'+esc(s.cust_invoice_no)+'</span>'
         : '<span style="color:var(--t3)">—</span>';
 
       // Build row — each td gets the background style so hover can't override
       return '<tr class="cr" onclick="openBillDet(\''+s.id+'\')">' +
         '<td'+tdStyle+'><div class="mono" style="color:var(--green-b);font-weight:700;font-size:11px">'+s.job_number+warnIcon+'</div><div style="font-size:10px;color:var(--t3)">'+(s.customer_name||'')+'</div></td>' +
         '<td'+tdStyle+' class="mono" style="'+(tdBg?tdBg+';':'')+' font-size:11px;font-weight:600">'+(logiInv||'<span style="color:var(--t3);font-family:inherit;font-weight:400">—</span>')+'</td>' +
+        '<td'+tdStyle+' style="'+(tdBg?tdBg+';':'')+' font-size:11px;color:var(--t2)">'+(s.consignee_name ? esc(s.consignee_name) : '<span style="color:var(--t3)">—</span>')+'</td>' +
         '<td'+tdStyle+' style="'+(tdBg?tdBg+';':'')+' font-size:11px;color:var(--t2)">'+routeDisplay+'</td>' +
         '<td'+tdStyle+'><span class="badge '+shipSt.badge+'" style="font-size:10px">'+shipSt.lbl+'</span></td>' +
         '<td'+tdStyle+'>'+billBadge+'</td>' +
@@ -3718,7 +3720,7 @@ function renderBillMain() {
           (!vendorPaid && (vendorAmt>0||dutyAmt>0) ? '<button class="btn btn-xs" onclick="markVendorPaid(\''+s.id+'\')">Mark V.Paid</button>' : '') +
         '</td>' +
       '</tr>';
-    }).join('') : '<tr><td colspan="12" class="t-empty">No shipments found</td></tr>') +
+    }).join('') : '<tr><td colspan="13" class="t-empty">No shipments found</td></tr>') +
     '</tbody>';
 }
 // Extra invoices modal
