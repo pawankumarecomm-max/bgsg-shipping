@@ -796,6 +796,7 @@ input[type="checkbox"].ship-chk{cursor:pointer;width:14px;height:14px;accent-col
           <input type="radio" name="pdf-cur" id="pdf-cur-usd" value="USD" style="accent-color:var(--blue)"> $ USD
         </label>
       </div>
+      <button class="btn btn-am" onclick="editFromView()">✏ Edit &amp; Save</button>
       <button class="btn btn-bl" onclick="exportQuotPDF()">📄 Export PDF</button>
       <button class="btn" onclick="closeMo('mo-quot-view')">Close</button>
     </div>
@@ -2419,7 +2420,7 @@ function renderQuots() {
     var wtKgs = q.chargeable_weight_kgs ? q.chargeable_weight_kgs + ' kg' : '';
     var wtCbm = q.chargeable_weight_cbm ? q.chargeable_weight_cbm + ' cbm' : '';
     var wt = (wtKgs && wtCbm) ? (wtKgs + ' / ' + wtCbm) : (wtKgs || wtCbm || (q.units ? q.units + ' u' : '—'));
-    return '<tr>' +
+    return '<tr class="cr" onclick="viewQuot(\''+q.id+'\')" style="cursor:pointer">' +
       '<td class="mono" style="color:var(--green-b);font-weight:700;white-space:nowrap">'+(q.quote_number||'—')+'</td>' +
       '<td class="mono" style="font-size:11px;white-space:nowrap;color:var(--t2)">'+(q.date||'—')+'</td>' +
       '<td style="font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis">'+(q.customer_name||'—')+'</td>' +
@@ -2432,9 +2433,8 @@ function renderQuots() {
       '<td class="mono" style="text-align:right"><span class="pb '+(m>=0?'pb-p':'pb-n')+'">₹'+fmt(Math.abs(m))+'</span></td>' +
       '<td class="mono" style="text-align:right;font-size:11px;font-weight:700;color:'+(mpct>=0?'var(--green-b)':'var(--red-b)')+'">'+mpct+'%</td>' +
       '<td>'+qsbadge(q.status)+'</td>' +
-      '<td style="white-space:nowrap;text-align:center">' +
-        '<button class="btn btn-xs btn-bl" onclick="viewQuot(\''+q.id+'\')">👁</button> ' +
-        '<button class="btn btn-xs" onclick="editQuotFn(\''+q.id+'\')">Edit</button> ' +
+      '<td style="white-space:nowrap;text-align:center" onclick="event.stopPropagation()">' +
+        '<button class="btn btn-xs" onclick="editQuotFn(\''+q.id+'\')">✏ Edit</button> ' +
         '<button class="btn btn-xs btn-am" onclick="copyQuot(\''+q.id+'\')" title="Copy into new quotation">⧉</button> ' +
         '<button class="btn btn-xs btn-rd" onclick="delQuot(\''+q.id+'\')">Del</button>' +
       '</td>' +
@@ -2479,12 +2479,14 @@ function allChargeHeads() {
   return all.filter(function(v,i){ return all.indexOf(v)===i; });
 }
 
+var DEFAULT_QUOT_NOTES = "• Receipted and GST will be applicable at actuals.\n• Exchange rates will be at actual at the time of billing.\n• Airliner delivery order charges will be billed at actual as per receipt.\n• Pallet fee: USD 45/pallet (If a single pallet cargo exceeds 300 KG, it will be produced, otherwise removed).\n• Any demurrage charges will be extra at actual.\n• Receipted and GST charges will be billed at actual.\n• Any miscellaneous charges will be taken prior approval.\n• Any additional services rendered other than above can be taken separate approval before proceeding.\n• Quotation is valid for 7 days only.";
+
 function openNewQuot() {
   editQuotId = null;
   document.getElementById('mo-quot-title').textContent = 'New Quotation';
   qRecvRows = defaultChargeRows('Air');
   qSentRows = defaultChargeRows('Air');
-  buildQuotForm({date: new Date().toISOString().slice(0,10), quote_number:'QT'+new Date().getFullYear()+String(DB.quots.length+1).padStart(4,'0'), status:'Draft', mode:'Air'});
+  buildQuotForm({date: new Date().toISOString().slice(0,10), quote_number:'QT'+new Date().getFullYear()+String(DB.quots.length+1).padStart(4,'0'), status:'Draft', mode:'Air', notes: DEFAULT_QUOT_NOTES});
   openMo('mo-quot');
 }
 
@@ -2586,6 +2588,13 @@ function qOnModeChange(val) {
     qCalcTotals();
     toast('Charge heads updated for '+val+' mode ✓','ok');
   }
+}
+
+function editFromView() {
+  var id = viewQuotId;
+  if (!id) return;
+  closeMo('mo-quot-view');
+  editQuotFn(id);
 }
 
 function editQuotFn(id) {
@@ -2817,8 +2826,17 @@ function viewQuot(id) {
 
   if (q.notes) {
     var notesDiv = document.createElement('div');
-    notesDiv.style.cssText = 'margin-top:10px;font-size:12px;color:var(--t2);background:var(--s2);border-radius:4px;padding:8px';
-    notesDiv.textContent = '📝 ' + q.notes;
+    notesDiv.style.cssText = 'margin-top:12px;background:#fef9ec;border:1px solid #fcd34d;border-radius:6px;padding:12px 14px';
+    var notesTitle = document.createElement('div');
+    notesTitle.style.cssText = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#92400e;margin-bottom:8px';
+    notesTitle.textContent = '📋 Terms & Notes';
+    notesDiv.appendChild(notesTitle);
+    var notesList = document.createElement('div');
+    notesList.style.cssText = 'font-size:11.5px;color:#451a03;line-height:1.7';
+    notesList.innerHTML = q.notes.split('\n').map(function(line){
+      return line.trim() ? '<div style="padding:1px 0">'+line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>' : '';
+    }).join('');
+    notesDiv.appendChild(notesList);
     body.appendChild(notesDiv);
   }
   openMo('mo-quot-view');
@@ -2879,7 +2897,7 @@ function buildQuotForm(q) {
     '</div>' +
     // Margin strip
     '<div style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:10px 14px;margin-top:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px" id="q-margin-strip"></div>' +
-    '<div class="fgi" style="margin-top:10px"><label class="fl">Notes</label><textarea class="fi" id="q_nt" rows="2">'+(q.notes||'')+'</textarea></div>';
+    '<div class="fgi" style="margin-top:10px"><label class="fl">Notes / Terms</label><textarea class="fi" id="q_nt" rows="9" style="font-size:11.5px;line-height:1.6">'+(q.notes||DEFAULT_QUOT_NOTES)+'</textarea></div>';
   setTimeout(function(){
     var jnEl = document.getElementById('q_jn');
     if (jnEl && q.job_number) jnEl.value = q.job_number;
@@ -3140,9 +3158,7 @@ function exportQuotPDF() {
   var pdfUnits = parseFloat(q.units) || 0;
   var pdfPerUnit = (pdfUnits > 0 && totalINR > 0) ? toDisplay(Math.round(totalINR / pdfUnits)) : 0;
 
-  var convNote = (!useINR && canConvert)
-    ? '<div style="font-size:10px;color:#64748b;margin-top:8px;text-align:right;font-style:italic">Exchange rate: 1 ' + pdfCur + ' = \u20b9' + qEx + ' INR</div>'
-    : '';
+  var convNote = '';
 
 
   var perUnitRow = (pdfPerUnit > 0)
@@ -3194,7 +3210,7 @@ function exportQuotPDF() {
   '</table>' +
   convNote +
   perUnitRow +
-  (q.notes ? '<div style="background:#fef9ec;border:1px solid #fcd34d;border-radius:6px;padding:12px 14px;margin-top:16px;margin-bottom:16px"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#92400e;margin-bottom:4px">Notes</div><div style="font-size:12px;color:#451a03">' + String(q.notes).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div></div>' : '<div style="margin-top:16px"></div>') +
+  (q.notes ? '<div style="background:#fef9ec;border:1px solid #fcd34d;border-radius:6px;padding:14px 16px;margin-top:16px;margin-bottom:16px"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#92400e;margin-bottom:10px">📋 Terms &amp; Notes</div>' + q.notes.split('\n').map(function(line){ return line.trim() ? '<div style="font-size:9px;color:#451a03;padding:1px 0;line-height:1.5">'+String(line).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>' : ''; }).join('') + '</div>' : '<div style="margin-top:16px"></div>') +
   '<div style="border-top:1px solid #e2e8f0;padding-top:14px;display:flex;justify-content:space-between;align-items:center">' +
     '<div style="font-size:10px;color:#94a3b8">This quotation is valid for 7 days from the date of issue. Prices subject to change.</div>' +
     '<div style="font-size:10px;color:#94a3b8">Generated: ' + new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) + '</div>' +
